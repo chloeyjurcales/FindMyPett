@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,15 +7,24 @@ import {
   ScrollView,
   Image,
   TextInput,
+  Keyboard,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const THEME = {
   darkBrown: '#5c2d06',
   lightBrown: '#d8b69f',
   cardBackground: '#ebd5c5',
   emptyCardBg: '#c3a28c',
-  inputBg: '#d8b69f',
+  sentBubble: '#5c2d06',
+  receivedBubble: '#ebd5c5',
+};
+
+type MessageItem = {
+  id: string;
+  text: string;
+  sender: 'me' | 'them';
+  timestamp: string;
 };
 
 type ChatUser = {
@@ -28,7 +37,7 @@ type ChatUser = {
   activeStatus?: string;
 };
 
-const MOCK_CHATS: ChatUser[] = [
+const INITIAL_CHATS: ChatUser[] = [
   {
     id: '1',
     name: 'Nadith Marie',
@@ -78,17 +87,40 @@ const MOCK_CHATS: ChatUser[] = [
 
 export default function ExploreScreen() {
   const router = useRouter();
-  
-  // Track active filter state
+  const params = useLocalSearchParams();
+
+  // Navigation Filter State
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'Unread' | 'Homescreen'>('All');
-  
-  // Track active individual chat screen (null = list view)
+
+  // Dynamic Chat List State
+  const [chatList, setChatList] = useState<ChatUser[]>(INITIAL_CHATS);
+
+  // Active Individual Chat State
   const [activeChat, setActiveChat] = useState<ChatUser | null>(null);
 
-  // Big Thumbs-Up reaction state
-  const [showThumbsUp, setShowThumbsUp] = useState(false);
+  // Input Field State
+  const [inputText, setInputText] = useState('');
 
-  const filteredChats = MOCK_CHATS.filter((chat) => {
+  // Persistent Messages Store
+  const [chatMessages, setChatMessages] = useState<Record<string, MessageItem[]>>({
+    '1': [{ id: 'm1', text: '👍', sender: 'me', timestamp: '12:00 AM' }],
+    '2': [{ id: 'm1', text: '👍', sender: 'me', timestamp: '1:51 PM' }],
+    '3': [{ id: 'm1', text: '👍', sender: 'me', timestamp: '1:52 PM' }],
+    '4': [{ id: 'm1', text: '👍', sender: 'me', timestamp: '1:21 PM' }],
+    '5': [{ id: 'm1', text: '👍', sender: 'me', timestamp: '1:59 PM' }],
+  });
+
+  // Listen for navigation requests coming from profile.tsx
+  useEffect(() => {
+    if (params.openChatId) {
+      const foundUser = chatList.find((c) => c.id === params.openChatId);
+      if (foundUser) {
+        setActiveChat(foundUser);
+      }
+    }
+  }, [params.openChatId]);
+
+  const filteredChats = chatList.filter((chat) => {
     if (selectedFilter === 'Unread') return chat.isUnread;
     return true;
   });
@@ -100,68 +132,155 @@ export default function ExploreScreen() {
     }
   };
 
-  const handleSendThumbsUp = () => {
-    setShowThumbsUp(true);
-    setTimeout(() => setShowThumbsUp(false), 2000); // Auto-hide big thumb after 2 seconds
+  // Function to view profile
+  const handleViewProfile = (userId: string) => {
+    router.push({
+      pathname: '/profile',
+      params: { userId },
+    });
   };
+
+  // Send message and bump account to top of list
+  const handleSendMessage = (textToSend?: string) => {
+    const text = textToSend || inputText.trim();
+    if (!text || !activeChat) return;
+
+    const currentTimeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // 1. Append message to chat thread
+    const newMessage: MessageItem = {
+      id: Date.now().toString(),
+      text,
+      sender: 'me',
+      timestamp: currentTimeString,
+    };
+
+    setChatMessages((prev) => ({
+      ...prev,
+      [activeChat.id]: [...(prev[activeChat.id] || []), newMessage],
+    }));
+
+    // 2. Move messaged user to position 0 (Top of the list)
+    setChatList((prevList) => {
+      const targetUser = prevList.find((item) => item.id === activeChat.id);
+      if (!targetUser) return prevList;
+
+      const updatedUser: ChatUser = {
+        ...targetUser,
+        time: currentTimeString,
+        message: `You: ${text}`,
+      };
+
+      const remainingUsers = prevList.filter((item) => item.id !== activeChat.id);
+      return [updatedUser, ...remainingUsers];
+    });
+
+    setInputText('');
+    Keyboard.dismiss();
+  };
+
+  const currentMessages = activeChat ? chatMessages[activeChat.id] || [] : [];
 
   return (
     <View style={styles.container}>
-      
       {/* ========================================== */}
-      {/* VIEW 1: INDIVIDUAL CHAT SCREEN (IF SELECTED) */}
+      {/* VIEW 1: INDIVIDUAL CHAT SCREEN             */}
       {/* ========================================== */}
       {activeChat ? (
         <View style={{ flex: 1 }}>
-          {/* CHAT HEADER WITH BACK BUTTON */}
+          {/* CHAT HEADER */}
           <View style={styles.chatHeader}>
             <TouchableOpacity onPress={() => setActiveChat(null)} activeOpacity={0.8} style={{ paddingRight: 10 }}>
               <Text style={styles.backArrow}>←</Text>
             </TouchableOpacity>
 
-            <Image source={{ uri: activeChat.avatar }} style={styles.headerAvatar} />
-
-            <View style={styles.headerMeta}>
-              <Text style={styles.chatHeaderTitle}>{activeChat.name}</Text>
-              <Text style={styles.chatHeaderStatus}>{activeChat.activeStatus || 'Active recently'}</Text>
-            </View>
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center' }} 
+              onPress={() => handleViewProfile(activeChat.id)}
+              activeOpacity={0.8}
+            >
+              <Image source={{ uri: activeChat.avatar }} style={styles.headerAvatar} />
+              <View style={styles.headerMeta}>
+                <Text style={styles.chatHeaderTitle}>{activeChat.name}</Text>
+                <Text style={styles.chatHeaderStatus}>{activeChat.activeStatus || 'Active recently'}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
 
-          {/* CHAT BODY PANEL WITH PROFILE PREVIEW */}
+          {/* CHAT BODY PANEL */}
           <View style={styles.chatBodyPanel}>
-            <ScrollView contentContainerStyle={styles.chatContentContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              contentContainerStyle={styles.chatContentContainer} 
+              showsVerticalScrollIndicator={false}
+            >
               {/* CENTER PROFILE BADGE */}
               <View style={styles.centerProfileCard}>
                 <Image source={{ uri: activeChat.avatar }} style={styles.largeAvatar} />
                 <Text style={styles.largeProfileName}>{activeChat.name}</Text>
-                <TouchableOpacity style={styles.viewProfileBtn} activeOpacity={0.8}>
+                <TouchableOpacity 
+                  style={styles.viewProfileBtn} 
+                  activeOpacity={0.8}
+                  onPress={() => handleViewProfile(activeChat.id)}
+                >
                   <Text style={styles.viewProfileText}>View profile</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* BIG THUMBS UP EFFECT */}
-              {showThumbsUp && (
-                <View style={styles.thumbsUpOverlay}>
-                  <Text style={{ fontSize: 90 }}>👍</Text>
-                </View>
-              )}
+              {/* RENDER PERSISTENT MESSAGES */}
+              <View style={styles.messageListContainer}>
+                {currentMessages.map((msg) => (
+                  <View
+                    key={msg.id}
+                    style={[
+                      styles.messageBubble,
+                      msg.sender === 'me' ? styles.myBubble : styles.theirBubble,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.messageText,
+                        msg.sender === 'me' ? styles.myMessageText : styles.theirMessageText,
+                        msg.text === '👍' && { fontSize: 32 },
+                      ]}
+                    >
+                      {msg.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </ScrollView>
 
-            {/* CHAT INPUT BAR */}
+            {/* INPUT BAR WITH DYNAMIC SEND / THUMBS-UP BUTTON */}
             <View style={styles.chatInputRow}>
               <TouchableOpacity style={styles.mediaButton} activeOpacity={0.8}>
                 <Text style={{ fontSize: 20 }}>🖼️</Text>
               </TouchableOpacity>
 
-              <TextInput 
-                style={styles.messageInput} 
-                placeholder="Message" 
-                placeholderTextColor="#6e4c31" 
+              <TextInput
+                style={styles.messageInput}
+                placeholder="Message"
+                placeholderTextColor="#6e4c31"
+                value={inputText}
+                onChangeText={setInputText}
               />
 
-              <TouchableOpacity style={styles.likeButton} onPress={handleSendThumbsUp} activeOpacity={0.8}>
-                <Text style={{ fontSize: 22 }}>👍</Text>
-              </TouchableOpacity>
+              {inputText.trim().length > 0 ? (
+                <TouchableOpacity 
+                  style={styles.sendButton} 
+                  onPress={() => handleSendMessage()} 
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.sendButtonIcon}>➤</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.likeButton} 
+                  onPress={() => handleSendMessage('👍')} 
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 22 }}>👍</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -214,23 +333,33 @@ export default function ExploreScreen() {
                 </Text>
               </View>
             ) : (
-              filteredChats.map((chat) => (
-                <TouchableOpacity 
-                  key={chat.id} 
-                  style={styles.chatCard} 
-                  activeOpacity={0.8}
-                  onPress={() => setActiveChat(chat)} // Open chat when profile or card clicked
-                >
-                  <Image source={{ uri: chat.avatar }} style={styles.chatAvatar} />
-                  <View style={styles.chatMeta}>
-                    <View style={styles.chatTopRow}>
-                      <Text style={styles.chatName}>{chat.name}</Text>
-                      <Text style={styles.chatTime}>{chat.time}</Text>
+              filteredChats.map((chat) => {
+                const msgs = chatMessages[chat.id] || [];
+                const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].text : chat.message.replace('You: ', '');
+
+                return (
+                  <TouchableOpacity
+                    key={chat.id}
+                    style={styles.chatCard}
+                    activeOpacity={0.8}
+                    onPress={() => setActiveChat(chat)}
+                  >
+                    <TouchableOpacity onPress={() => handleViewProfile(chat.id)} activeOpacity={0.8}>
+                      <Image source={{ uri: chat.avatar }} style={styles.chatAvatar} />
+                    </TouchableOpacity>
+                    
+                    <View style={styles.chatMeta}>
+                      <View style={styles.chatTopRow}>
+                        <Text style={styles.chatName}>{chat.name}</Text>
+                        <Text style={styles.chatTime}>{chat.time}</Text>
+                      </View>
+                      <Text style={styles.chatMessage} numberOfLines={1}>
+                        You: {lastMsg}
+                      </Text>
                     </View>
-                    <Text style={styles.chatMessage}>{chat.message}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
+                  </TouchableOpacity>
+                );
+              })
             )}
           </ScrollView>
         </View>
@@ -238,16 +367,16 @@ export default function ExploreScreen() {
 
       {/* CUSTOM BOTTOM NAVIGATION BAR */}
       <View style={styles.customBottomBar}>
-        <TouchableOpacity 
-          style={styles.barButton} 
+        <TouchableOpacity
+          style={styles.barButton}
           onPress={() => router.replace('/')}
           activeOpacity={0.8}
         >
           <Text style={styles.barIcon}>🚪</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.barButton} 
+        <TouchableOpacity
+          style={styles.barButton}
           onPress={() => {
             setActiveChat(null);
             router.push('/(tabs)');
@@ -410,7 +539,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  /* CHAT DETAIL SCREEN STYLES */
+  /* CHAT DETAIL SCREEN */
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -452,25 +581,27 @@ const styles = StyleSheet.create({
   },
   chatContentContainer: {
     alignItems: 'center',
-    paddingTop: 30,
+    paddingTop: 20,
+    paddingBottom: 20,
     flexGrow: 1,
   },
   centerProfileCard: {
     alignItems: 'center',
+    marginBottom: 20,
   },
   largeAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     borderWidth: 2,
     borderColor: '#5c2d06',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   largeProfileName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#331800',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   viewProfileBtn: {
     backgroundColor: THEME.cardBackground,
@@ -485,10 +616,38 @@ const styles = StyleSheet.create({
     color: '#4a2c11',
     fontWeight: '500',
   },
-  thumbsUpOverlay: {
-    position: 'absolute',
-    right: 25,
-    bottom: 30,
+
+  /* MESSAGE BUBBLES */
+  messageListContainer: {
+    width: '100%',
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+  messageBubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    marginVertical: 4,
+    maxWidth: '75%',
+  },
+  myBubble: {
+    backgroundColor: THEME.sentBubble,
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+  },
+  theirBubble: {
+    backgroundColor: THEME.receivedBubble,
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
+  },
+  messageText: {
+    fontSize: 14,
+  },
+  myMessageText: {
+    color: '#ffffff',
+  },
+  theirMessageText: {
+    color: '#331800',
   },
 
   /* CHAT INPUT BAR */
@@ -515,6 +674,20 @@ const styles = StyleSheet.create({
   },
   likeButton: {
     marginLeft: 10,
+  },
+  sendButton: {
+    marginLeft: 10,
+    backgroundColor: THEME.darkBrown,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonIcon: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 
   /* BOTTOM NAVIGATION BAR */
