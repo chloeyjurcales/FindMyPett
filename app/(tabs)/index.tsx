@@ -5,18 +5,16 @@ import {
   Text, 
   Image, 
   ScrollView, 
-  TouchableOpacity, 
-  SafeAreaView 
+  TouchableOpacity 
 } from 'react-native';
+import { useRouter } from 'expo-router';
 
-// Local Theme Colors definition
 const THEME = {
   darkBrown: '#5c2d06',
   lightBrown: '#d8b69f',
   cardBackground: '#ebd5c5',
 };
 
-// Mock Data
 const MOCK_POSTS = [
   {
     id: 1,
@@ -30,8 +28,10 @@ const MOCK_POSTS = [
 ];
 
 export default function DashboardScreen() {
+  const router = useRouter();
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* TOP HEADER PROFILE BANNER */}
       <View style={styles.header}>
         <View style={styles.profileRow}>
@@ -39,12 +39,12 @@ export default function DashboardScreen() {
             <View style={styles.avatarPlaceholder} />
             <View style={styles.onlineStatusDot} />
           </View>
-          <View>
+          <View style={styles.nameWrapper}>
             <Text style={styles.welcomeText}>Welcome!</Text>
             <Text style={styles.profileName}>Jurcales, Chloey Lyca</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.notificationBell}>
+        <TouchableOpacity style={styles.notificationBell} activeOpacity={0.8}>
           <Text style={{ fontSize: 18 }}>🔔</Text>
         </TouchableOpacity>
       </View>
@@ -118,7 +118,26 @@ export default function DashboardScreen() {
           </View>
         ))}
       </ScrollView>
-    </SafeAreaView>
+
+      {/* CUSTOM DARK BROWN NAVIGATION BAR FOR FEED */}
+      <View style={styles.customBottomBar}>
+        <TouchableOpacity 
+          style={styles.barButton} 
+          onPress={() => router.replace('/')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.barIcon}>🚪</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.barButton} 
+          onPress={() => router.push('/(tabs)/explore')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.barIcon}>💬</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -126,11 +145,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: THEME.darkBrown,
+    paddingTop: 35,
   },
   header: {
     backgroundColor: THEME.darkBrown,
     paddingHorizontal: 20,
-    paddingTop: 15,
+    paddingTop: 10,
     paddingBottom: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -145,12 +165,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatarPlaceholder: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#9c6644',
-    borderWidth: 1,
-    borderColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
   },
   onlineStatusDot: {
     width: 12,
@@ -158,26 +178,30 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#00ff00',
     position: 'absolute',
-    right: 0,
-    top: 0,
-    borderWidth: 1.5,
+    right: 2,
+    top: 2,
+    borderWidth: 2,
     borderColor: THEME.darkBrown,
   },
+  nameWrapper: {
+    justifyContent: 'center',
+  },
   welcomeText: {
-    color: '#fff',
+    color: '#ebd5c5',
     fontSize: 12,
-    opacity: 0.8,
+    opacity: 0.9,
   },
   profileName: {
-    color: '#fff',
+    color: '#ffffff',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 15,
+    marginTop: 2,
   },
   notificationBell: {
     backgroundColor: '#f5c469',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -314,5 +338,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#5c2d06',
     fontWeight: '500',
+  },
+
+  /* UPDATED BOTTOM BAR STYLES */
+  customBottomBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: THEME.darkBrown,
+    height: 75,
+    paddingBottom: 8,
+  },
+  barButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: THEME.cardBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barIcon: {
+    fontSize: 24,
   },
 });
