@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
   Image,
-  TextInput,
   Keyboard,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+
+const klowieAvatar = require('@/assets/images/klowe.png');
 
 const THEME = {
   darkBrown: '#5c2d06',
@@ -292,13 +294,21 @@ export default function ExploreScreen() {
           {/* TOP HEADER */}
           <View style={styles.header}>
             <View style={styles.profileRow}>
-              <View style={styles.avatarContainer}>
-                <View style={styles.avatarPlaceholder} />
+              <TouchableOpacity
+                style={styles.avatarContainer}
+                onPress={() => router.push('/my-profile')}
+                activeOpacity={0.8}
+              >
+                <Image source={klowieAvatar} style={styles.avatarPlaceholder} />
                 <View style={styles.onlineStatusDot} />
-              </View>
+              </TouchableOpacity>
               <Text style={styles.profileName}>Jurcales, Chloey Lyca</Text>
             </View>
-            <TouchableOpacity style={styles.notificationBell} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.notificationBell}
+              activeOpacity={0.8}
+              onPress={() => router.push('/notifications')}
+            >
               <Text style={{ fontSize: 18 }}>🔔</Text>
             </TouchableOpacity>
           </View>

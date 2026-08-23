@@ -1,13 +1,17 @@
-import React from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
 import {
+  Image,
+  ScrollView,
   StyleSheet,
-  View,
   Text,
   TouchableOpacity,
-  ScrollView,
-  Image,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+
+const lance = require('../assets/images/lance.png');
+const yuji = require('../assets/images/yuji.png');
+const nadith = require('../assets/images/nadith.png');
 
 const THEME = {
   darkBrown: '#5c2d06',
@@ -21,19 +25,19 @@ const PROFILES_DATA: Record<string, any> = {
   '1': {
     id: '1',
     name: 'Nadith Marie',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    avatar: nadith,
     hasPosts: false,
   },
   '2': {
     id: '2',
     name: 'Cluwe Yuji',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    avatar: yuji,
     hasPosts: false,
   },
   '3': {
     id: '3',
     name: 'Lance Fernandez',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+    avatar: lance,
     hasPosts: false,
   },
   '4': {
@@ -57,10 +61,18 @@ const PROFILES_DATA: Record<string, any> = {
 export default function ProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+
   // Default to Nadith Marie ('1') if no profile ID is passed
   const profileId = (params.userId as string) || '1';
   const profile = PROFILES_DATA[profileId] || PROFILES_DATA['1'];
+
+  const [liked, setLiked] = useState<boolean>(false);
+  const [likeCount, setLikeCount] = useState<number>(profile.likes || 0);
+
+  const handleToggleLike = () => {
+    setLiked((prev) => !prev);
+    setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+  };
 
   const handleMessagePress = () => {
     // Navigate to Explore/Chat tab and open this specific chat
@@ -102,7 +114,7 @@ export default function ProfileScreen() {
           {profile.hasPosts ? (
             <View style={styles.postCard}>
               <Text style={styles.allPostsTitle}>All posts</Text>
-              
+
               <View style={styles.postHeader}>
                 <Image source={{ uri: profile.avatar }} style={styles.postAvatar} />
                 <View>
@@ -114,15 +126,29 @@ export default function ProfileScreen() {
               <Image source={{ uri: profile.postImage }} style={styles.postImage} />
 
               <View style={styles.postStats}>
-                <Text style={styles.statText}>❤️ {profile.likes}</Text>
+                <Text style={styles.statText}>❤️ {likeCount}</Text>
                 <Text style={styles.statText}>👁️ {profile.views}</Text>
               </View>
 
               <View style={styles.postActions}>
-                <TouchableOpacity style={styles.actionBtn}>
-                  <Text style={styles.actionText}>👍 Like</Text>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={handleToggleLike}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.actionText, liked && styles.actionTextLiked]}>
+                    {liked ? '❤️ Liked' : '👍 Like'}
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/comments',
+                      params: { postId: profile.id, likes: String(likeCount) },
+                    })
+                  }
+                >
                   <Text style={styles.actionText}>💬 Comment</Text>
                 </TouchableOpacity>
               </View>
@@ -297,6 +323,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#4a2c11',
+  },
+  actionTextLiked: {
+    color: '#d32f2f',
   },
   customBottomBar: {
     flexDirection: 'row',

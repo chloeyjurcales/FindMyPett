@@ -1,15 +1,16 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Alert,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  StatusBar,
-  ScrollView,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -25,6 +26,19 @@ export default function AuthScreen() {
 
   // Handle Login button action
   const handleLogin = () => {
+    if (
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !password.trim() ||
+      !location.trim()
+    ) {
+      Alert.alert(
+        'Missing information',
+        'Please fill in your first name, last name, password, and location before logging in.'
+      );
+      return;
+    }
+
     // Navigate directly to the main feed dashboard
     router.replace('/(tabs)');
   };

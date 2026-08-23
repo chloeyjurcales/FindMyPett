@@ -1,13 +1,19 @@
-import React from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  Image, 
-  ScrollView, 
-  TouchableOpacity 
-} from 'react-native';
+import { toggleLike, usePosts } from '@/store/posts-store';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import React from 'react';
+import {
+  Alert,
+  Image,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+const klowieAvatar = require('@/assets/images/klowe.png');
 
 const THEME = {
   darkBrown: '#5c2d06',
@@ -15,47 +21,98 @@ const THEME = {
   cardBackground: '#ebd5c5',
 };
 
-const MOCK_POSTS = [
-  {
-    id: 1,
-    author: 'Junrel Alipogpog',
-    location: 'Banban, Bogo, Cebu • 3 hours ago',
-    imageUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=500',
-    likes: 21,
-    comments: 30,
-    body: 'Our dog went missing'
-  }
-];
-
 export default function DashboardScreen() {
   const router = useRouter();
+  const posts = usePosts();
+
+  const handleToggleLike = (postId: string) => {
+    toggleLike(postId);
+  };
+
+  const handlePickImage = async () => {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert(
+        'Permission needed',
+        'Please allow photo library access to add a photo.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      router.push({
+        pathname: '/new-post',
+        params: { imageUri: result.assets[0].uri },
+      });
+    }
+  };
+
+  const handlePostOptions = () => {
+    Alert.alert('Post options', undefined, [
+      {
+        text: 'Report post',
+        style: 'destructive',
+        onPress: () => Alert.alert('Reported', "Thanks, we'll take a look."),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleShare = async (body: string, author: string) => {
+    try {
+      await Share.share({
+        message: `${author} on FindMyPetApp: ${body}`,
+      });
+    } catch {
+      // Share sheet dismissed or unavailable — nothing to do.
+    }
+  };
 
   return (
     <View style={styles.container}>
       {/* TOP HEADER PROFILE BANNER */}
       <View style={styles.header}>
         <View style={styles.profileRow}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarPlaceholder} />
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={() => router.push('/my-profile')}
+            activeOpacity={0.8}
+          >
+            <Image source={klowieAvatar} style={styles.avatarPlaceholder} />
             <View style={styles.onlineStatusDot} />
-          </View>
-          <View style={styles.nameWrapper}>
-            <Text style={styles.welcomeText}>Welcome!</Text>
-            <Text style={styles.profileName}>Jurcales, Chloey Lyca</Text>
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/my-profile')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.nameWrapper}>
+              <Text style={styles.welcomeText}>Welcome!</Text>
+              <Text style={styles.profileName}>Jurcales, Chloey Lyca</Text>
+            </View>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.notificationBell} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.notificationBell}
+          activeOpacity={0.8}
+          onPress={() => router.push('/notifications')}
+        >
           <Text style={{ fontSize: 18 }}>🔔</Text>
         </TouchableOpacity>
       </View>
 
       {/* RENDER BODY PANEL */}
-      <ScrollView 
-        style={styles.feedScroll} 
+      <ScrollView
+        style={styles.feedScroll}
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        
         {/* Brand Placement Shield Row */}
         <View style={styles.brandPanel}>
           <View style={styles.miniLogoCircle}>
@@ -66,24 +123,44 @@ export default function DashboardScreen() {
 
         {/* Create Post Interactive Bar */}
         <View style={styles.createPostCard}>
-          <TouchableOpacity style={styles.photoUploadButton}>
+          <TouchableOpacity
+            style={styles.photoUploadButton}
+            onPress={handlePickImage}
+          >
             <Text style={styles.photoButtonText}>🖼️ Photo</Text>
           </TouchableOpacity>
           <Text style={styles.helperText}>Post or Report a missing pet</Text>
         </View>
 
         {/* LOOP INCOMING POSTS */}
-        {MOCK_POSTS.map((post) => (
+        {posts.map((post) => (
           <View key={post.id} style={styles.postCard}>
-            
             {/* Post Header */}
             <View style={styles.postHeader}>
-              <View style={styles.postAvatar} />
-              <View style={styles.postMeta}>
-                <Text style={styles.postAuthor}>{post.author}</Text>
-                <Text style={styles.postTime}>{post.location}</Text>
-              </View>
-              <TouchableOpacity>
+              <TouchableOpacity
+                style={styles.postHeaderTouchable}
+                activeOpacity={post.authorAvatar ? 0.7 : 1}
+                disabled={!post.authorAvatar}
+                onPress={() => router.push('/my-profile')}
+              >
+                {post.authorAvatar ? (
+                  <Image
+                    source={
+                      typeof post.authorAvatar === 'string'
+                        ? { uri: post.authorAvatar }
+                        : post.authorAvatar
+                    }
+                    style={styles.postAvatar}
+                  />
+                ) : (
+                  <View style={styles.postAvatar} />
+                )}
+                <View style={styles.postMeta}>
+                  <Text style={styles.postAuthor}>{post.author}</Text>
+                  <Text style={styles.postTime}>{post.location}</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handlePostOptions}>
                 <Text style={styles.threeDots}>⋮</Text>
               </TouchableOpacity>
             </View>
@@ -97,40 +174,61 @@ export default function DashboardScreen() {
             {/* Engagement Metrics */}
             <View style={styles.metricsRow}>
               <Text style={styles.metricItem}>❤️ {post.likes}</Text>
-              <Text style={styles.metricItem}>👁️ {post.comments}</Text>
+              <Text style={styles.metricItem}>👁️ {post.views}</Text>
             </View>
 
             <View style={styles.divider} />
 
             {/* Action Bar */}
             <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionText}>🤍 Like</Text>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleToggleLike(post.id)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.actionText,
+                    post.liked && styles.actionTextLiked,
+                  ]}
+                >
+                  {post.liked ? '❤️ Liked' : '🤍 Like'}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() =>
+                  router.push({
+                    pathname: '/comments',
+                    params: { postId: post.id },
+                  })
+                }
+              >
                 <Text style={styles.actionText}>💬 Comment</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleShare(post.body, post.author)}
+              >
                 <Text style={styles.actionText}>➡️ Share</Text>
               </TouchableOpacity>
             </View>
-
           </View>
         ))}
       </ScrollView>
 
       {/* CUSTOM DARK BROWN NAVIGATION BAR FOR FEED */}
       <View style={styles.customBottomBar}>
-        <TouchableOpacity 
-          style={styles.barButton} 
+        <TouchableOpacity
+          style={styles.barButton}
           onPress={() => router.replace('/')}
           activeOpacity={0.8}
         >
           <Text style={styles.barIcon}>🚪</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.barButton} 
+        <TouchableOpacity
+          style={styles.barButton}
           onPress={() => router.push('/(tabs)/explore')}
           activeOpacity={0.8}
         >
@@ -273,6 +371,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  postHeaderTouchable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   postAvatar: {
     width: 36,
     height: 36,
@@ -338,6 +441,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#5c2d06',
     fontWeight: '500',
+  },
+  actionTextLiked: {
+    color: '#d32f2f',
   },
 
   /* UPDATED BOTTOM BAR STYLES */

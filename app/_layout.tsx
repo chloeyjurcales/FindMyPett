@@ -5,12 +5,14 @@ export default function RootLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       {/* The landing login screen */}
       <Stack.Screen name="index" />
-      
+
       {/* The main tab navigation */}
       <Stack.Screen name="(tabs)" />
-      
+
       {/* Modal windows */}
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="comments" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="new-post" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }
