@@ -1,469 +1,197 @@
-import { toggleLike, usePosts } from '@/store/posts-store';
-import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import {
-  Alert,
-  Image,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const klowieAvatar = require('@/assets/images/klowe.png');
+const PINK = "#EE5C93";
+const LIGHT_PINK = "#FBD9E7";
+const TEXT_GRAY = "#7A7A7A";
 
-const THEME = {
-  darkBrown: '#5c2d06',
-  lightBrown: '#d8b69f',
-  cardBackground: '#ebd5c5',
-};
-
-export default function DashboardScreen() {
+export default function HomeScreen() {
   const router = useRouter();
-  const posts = usePosts();
-
-  const handleToggleLike = (postId: string) => {
-    toggleLike(postId);
-  };
-
-  const handlePickImage = async () => {
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert(
-        'Permission needed',
-        'Please allow photo library access to add a photo.'
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      router.push({
-        pathname: '/new-post',
-        params: { imageUri: result.assets[0].uri },
-      });
-    }
-  };
-
-  const handlePostOptions = () => {
-    Alert.alert('Post options', undefined, [
-      {
-        text: 'Report post',
-        style: 'destructive',
-        onPress: () => Alert.alert('Reported', "Thanks, we'll take a look."),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const handleShare = async (body: string, author: string) => {
-    try {
-      await Share.share({
-        message: `${author} on FindMyPetApp: ${body}`,
-      });
-    } catch {
-      // Share sheet dismissed or unavailable — nothing to do.
-    }
-  };
 
   return (
-    <View style={styles.container}>
-      {/* TOP HEADER PROFILE BANNER */}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.profileRow}>
-          <TouchableOpacity
-            style={styles.avatarContainer}
-            onPress={() => router.push('/my-profile')}
-            activeOpacity={0.8}
-          >
-            <Image source={klowieAvatar} style={styles.avatarPlaceholder} />
-            <View style={styles.onlineStatusDot} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push('/my-profile')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.nameWrapper}>
-              <Text style={styles.welcomeText}>Welcome!</Text>
-              <Text style={styles.profileName}>Jurcales, Chloey Lyca</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
         <TouchableOpacity
-          style={styles.notificationBell}
-          activeOpacity={0.8}
-          onPress={() => router.push('/notifications')}
+          onPress={() => {
+            // TODO: wire up side menu/drawer later
+          }}
         >
-          <Text style={{ fontSize: 18 }}>🔔</Text>
+          <Ionicons name="menu" size={26} color="#1A1A1A" />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Home</Text>
+
+        <TouchableOpacity onPress={() => router.push("/(tabs)/alerts")}>
+          <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
         </TouchableOpacity>
       </View>
 
-      {/* RENDER BODY PANEL */}
       <ScrollView
-        style={styles.feedScroll}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Brand Placement Shield Row */}
-        <View style={styles.brandPanel}>
-          <View style={styles.miniLogoCircle}>
-            <Text style={{ fontSize: 24 }}>🐾</Text>
+        {/* Lost a pet banner */}
+        <View style={styles.banner}>
+          <View style={styles.bannerTextArea}>
+            <Text style={styles.bannerTitle}>Lost a pet?</Text>
+            <Text style={styles.bannerSubtitle}>
+              Report and get help from{"\n"}your neighbors.
+            </Text>
+            <TouchableOpacity
+              style={styles.reportNowButton}
+              activeOpacity={0.85}
+              onPress={() => router.push("/(tabs)/report")}
+            >
+              <Text style={styles.reportNowText}>Report Now</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.locationText}>📍 Cebu, Philippines</Text>
+
+          {/* Decorative icons — placeholder for a dog/cat illustration asset */}
+          <View style={styles.bannerDecoration}>
+            <Ionicons
+              name="heart"
+              size={22}
+              color={PINK}
+              style={styles.bannerHeart}
+            />
+            <Ionicons name="paw" size={64} color="rgba(0,0,0,0.12)" />
+          </View>
         </View>
 
-        {/* Create Post Interactive Bar */}
-        <View style={styles.createPostCard}>
+        {/* Recent Posts section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Posts</Text>
           <TouchableOpacity
-            style={styles.photoUploadButton}
-            onPress={handlePickImage}
+            onPress={() => {
+              // TODO: navigate to a full posts list once posts exist
+            }}
           >
-            <Text style={styles.photoButtonText}>🖼️ Photo</Text>
+            <Text style={styles.seeAllText}>See All</Text>
           </TouchableOpacity>
-          <Text style={styles.helperText}>Post or Report a missing pet</Text>
         </View>
 
-        {/* LOOP INCOMING POSTS */}
-        {posts.map((post) => (
-          <View key={post.id} style={styles.postCard}>
-            {/* Post Header */}
-            <View style={styles.postHeader}>
-              <TouchableOpacity
-                style={styles.postHeaderTouchable}
-                activeOpacity={post.authorAvatar ? 0.7 : 1}
-                disabled={!post.authorAvatar}
-                onPress={() => router.push('/my-profile')}
-              >
-                {post.authorAvatar ? (
-                  <Image
-                    source={
-                      typeof post.authorAvatar === 'string'
-                        ? { uri: post.authorAvatar }
-                        : post.authorAvatar
-                    }
-                    style={styles.postAvatar}
-                  />
-                ) : (
-                  <View style={styles.postAvatar} />
-                )}
-                <View style={styles.postMeta}>
-                  <Text style={styles.postAuthor}>{post.author}</Text>
-                  <Text style={styles.postTime}>{post.location}</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handlePostOptions}>
-                <Text style={styles.threeDots}>⋮</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Content Image */}
-            <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
-
-            {/* Description Text */}
-            <Text style={styles.postBodyText}>{post.body}</Text>
-
-            {/* Engagement Metrics */}
-            <View style={styles.metricsRow}>
-              <Text style={styles.metricItem}>❤️ {post.likes}</Text>
-              <Text style={styles.metricItem}>👁️ {post.views}</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Action Bar */}
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleToggleLike(post.id)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.actionText,
-                    post.liked && styles.actionTextLiked,
-                  ]}
-                >
-                  {post.liked ? '❤️ Liked' : '🤍 Like'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() =>
-                  router.push({
-                    pathname: '/comments',
-                    params: { postId: post.id },
-                  })
-                }
-              >
-                <Text style={styles.actionText}>💬 Comment</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleShare(post.body, post.author)}
-              >
-                <Text style={styles.actionText}>➡️ Share</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+        {/* Empty state — no posts table wired up yet */}
+        <View style={styles.emptyState}>
+          <Ionicons name="paw-outline" size={40} color="#C9C9C9" />
+          <Text style={styles.emptyTitle}>No posts yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Lost or found pet reports from your{"\n"}neighborhood will show up
+            here.
+          </Text>
+        </View>
       </ScrollView>
-
-      {/* CUSTOM DARK BROWN NAVIGATION BAR FOR FEED */}
-      <View style={styles.customBottomBar}>
-        <TouchableOpacity
-          style={styles.barButton}
-          onPress={() => router.replace('/')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.barIcon}>🚪</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.barButton}
-          onPress={() => router.push('/(tabs)/explore')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.barIcon}>💬</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.darkBrown,
-    paddingTop: 35,
+    backgroundColor: "#FFFFFF",
   },
   header: {
-    backgroundColor: THEME.darkBrown,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingVertical: 14,
   },
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#9c6644',
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
-  },
-  onlineStatusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#00ff00',
-    position: 'absolute',
-    right: 2,
-    top: 2,
-    borderWidth: 2,
-    borderColor: THEME.darkBrown,
-  },
-  nameWrapper: {
-    justifyContent: 'center',
-  },
-  welcomeText: {
-    color: '#ebd5c5',
-    fontSize: 12,
-    opacity: 0.9,
-  },
-  profileName: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 15,
-    marginTop: 2,
-  },
-  notificationBell: {
-    backgroundColor: '#f5c469',
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  feedScroll: {
-    flex: 1,
-    backgroundColor: THEME.lightBrown,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingTop: 15,
-  },
-  brandPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
-  miniLogoCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#ebd5c5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 3,
-  },
-  locationText: {
-    color: '#331800',
-    fontWeight: 'bold',
-    marginLeft: 12,
-    fontSize: 13,
-  },
-  createPostCard: {
-    backgroundColor: '#ebd5c5',
-    marginHorizontal: 16,
-    marginVertical: 10,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-  },
-  photoUploadButton: {
-    backgroundColor: '#f2e3d5',
-    width: '100%',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: '#bfa28f',
-  },
-  photoButtonText: {
-    color: '#331800',
-    fontWeight: '500',
-  },
-  helperText: {
-    fontSize: 10,
-    color: '#6e4c31',
-    marginTop: 6,
-  },
-  postCard: {
-    backgroundColor: '#ebd5c5',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 0.5,
-    borderColor: '#cdb4a4',
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  postHeaderTouchable: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  postAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#5c2d06',
-  },
-  postMeta: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  postAuthor: {
-    fontWeight: 'bold',
-    fontSize: 13,
-    color: '#331800',
-  },
-  postTime: {
-    fontSize: 10,
-    color: '#7c5d43',
-  },
-  threeDots: {
+  headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#331800',
-    paddingHorizontal: 6,
+    fontWeight: "700",
+    color: "#1A1A1A",
   },
-  postImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 8,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 30,
   },
-  postBodyText: {
-    fontSize: 12,
-    color: '#4a2c11',
-    marginBottom: 8,
-    paddingHorizontal: 4,
+  banner: {
+    flexDirection: "row",
+    backgroundColor: LIGHT_PINK,
+    borderRadius: 22,
+    padding: 20,
+    marginTop: 8,
+    overflow: "hidden",
   },
-  metricsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 4,
-    marginBottom: 8,
-  },
-  metricItem: {
-    fontSize: 11,
-    color: '#7c5d43',
-    marginRight: 15,
-  },
-  divider: {
-    height: 0.5,
-    backgroundColor: '#bfa28f',
-    marginBottom: 8,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
+  bannerTextArea: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: 4,
   },
-  actionText: {
-    fontSize: 12,
-    color: '#5c2d06',
-    fontWeight: '500',
+  bannerTitle: {
+    fontSize: 19,
+    fontWeight: "700",
+    color: "#1A1A1A",
   },
-  actionTextLiked: {
-    color: '#d32f2f',
+  bannerSubtitle: {
+    fontSize: 13,
+    color: "#5C5C5C",
+    marginTop: 6,
+    lineHeight: 19,
   },
-
-  /* UPDATED BOTTOM BAR STYLES */
-  customBottomBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: THEME.darkBrown,
-    height: 75,
-    paddingBottom: 8,
+  reportNowButton: {
+    backgroundColor: "#1A1A1A",
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignSelf: "flex-start",
+    marginTop: 16,
   },
-  barButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: THEME.cardBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
+  reportNowText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
-  barIcon: {
-    fontSize: 24,
+  bannerDecoration: {
+    width: 90,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  bannerHeart: {
+    position: "absolute",
+    top: 0,
+    right: 4,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 26,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  seeAllText: {
+    color: PINK,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 50,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#8A8A8A",
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: TEXT_GRAY,
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 19,
   },
 });

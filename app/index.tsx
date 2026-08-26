@@ -1,266 +1,208 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function AuthScreen() {
+const PINK = "#EE5C93";
+const LIGHT_PINK = "#F9C9DB";
+const GRAY_PAW = "#EDEDED";
+
+export default function WelcomeScreen() {
   const router = useRouter();
 
-  // State to track if user pressed "ENTER" (Frame 1 vs Frame 2)
-  const [isFormVisible, setIsFormVisible] = useState(false);
-
-  // Form input states
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [password, setPassword] = useState('');
-  const [location, setLocation] = useState('');
-
-  // Handle Login button action
-  const handleLogin = () => {
-    if (
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !password.trim() ||
-      !location.trim()
-    ) {
-      Alert.alert(
-        'Missing information',
-        'Please fill in your first name, last name, password, and location before logging in.'
-      );
-      return;
-    }
-
-    // Navigate directly to the main feed dashboard
-    router.replace('/(tabs)');
-  };
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#d8b69f" />
+    <View style={styles.container}>
+      {/* Decorative background paw prints */}
+      <Ionicons
+        name="paw"
+        size={26}
+        color={GRAY_PAW}
+        style={[
+          styles.bgPaw,
+          { top: 90, left: 40, transform: [{ rotate: "-20deg" }] },
+        ]}
+      />
+      <Ionicons
+        name="paw"
+        size={20}
+        color={GRAY_PAW}
+        style={[
+          styles.bgPaw,
+          { top: 60, right: 60, transform: [{ rotate: "15deg" }] },
+        ]}
+      />
+      <Ionicons
+        name="paw"
+        size={22}
+        color={GRAY_PAW}
+        style={[
+          styles.bgPaw,
+          { top: 220, right: 30, transform: [{ rotate: "-10deg" }] },
+        ]}
+      />
+      <Ionicons
+        name="paw"
+        size={18}
+        color={GRAY_PAW}
+        style={[
+          styles.bgPaw,
+          { top: 260, left: 20, transform: [{ rotate: "25deg" }] },
+        ]}
+      />
+      <Ionicons
+        name="paw"
+        size={24}
+        color={GRAY_PAW}
+        style={[
+          styles.bgPaw,
+          { top: 480, left: 50, transform: [{ rotate: "10deg" }] },
+        ]}
+      />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* FRAME 1: WELCOME / LANDING SCREEN */}
-        {!isFormVisible ? (
-          <View style={styles.frameContainer}>
-            {/* Large Paw Pin Logo */}
-            <View style={styles.largeLogoCircle}>
-              <Text style={{ fontSize: 75 }}>📍</Text>
-            </View>
-
-            {/* Title & Tag */}
-            <Text style={styles.appTitle}>FindMyPetApp Design</Text>
-            <View style={styles.namePill}>
-              <Text style={styles.namePillText}>Chloey Lyca</Text>
-            </View>
-
-            {/* ENTER BUTTON */}
-            <TouchableOpacity
-              style={styles.enterButton}
-              onPress={() => setIsFormVisible(true)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.buttonText}>ENTER</Text>
-            </TouchableOpacity>
+      <SafeAreaView style={styles.content}>
+        {/* Pin-shaped logo with paw + heart */}
+        <View style={styles.pinWrapper}>
+          <Ionicons name="location" size={130} color={PINK} />
+          <View style={styles.pinPawOverlay}>
+            <Ionicons name="paw" size={34} color="#fff" />
           </View>
-        ) : (
-          /* FRAME 2: LOGIN FORM SCREEN */
-          <View style={styles.frameContainer}>
-            {/* Smaller Paw Pin Badge */}
-            <View style={styles.smallLogoCircle}>
-              <Text style={{ fontSize: 36 }}>📍</Text>
-            </View>
+        </View>
 
-            <Text style={styles.appTitleSmall}>FindMyPetApp Design</Text>
+        {/* App name */}
+        <View style={styles.titleRow}>
+          <Text style={styles.titleDark}>Find</Text>
+          <Text style={styles.titlePink}>My</Text>
+          <Text style={styles.titleDark}>PetApp</Text>
+        </View>
 
-            {/* Input Fields */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>FIRST NAME:</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your First Name"
-                placeholderTextColor="#9e8473"
-                value={firstName}
-                onChangeText={setFirstName}
-              />
+        {/* Tagline */}
+        <Text style={styles.subtitle}>
+          Because every pet{"\n"}deserves to be home.
+        </Text>
 
-              <Text style={styles.label}>LAST NAME:</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your Last Name"
-                placeholderTextColor="#9e8473"
-                value={lastName}
-                onChangeText={setLastName}
-              />
+        {/* Small paw trail + heart accent */}
+        <View style={styles.trailRow}>
+          <Ionicons
+            name="paw"
+            size={22}
+            color={PINK}
+            style={{ transform: [{ rotate: "-15deg" }] }}
+          />
+          <Ionicons
+            name="paw"
+            size={16}
+            color={PINK}
+            style={{
+              marginLeft: 8,
+              marginTop: 22,
+              transform: [{ rotate: "10deg" }],
+            }}
+          />
+          <Ionicons
+            name="heart-outline"
+            size={30}
+            color={PINK}
+            style={{ marginLeft: 30 }}
+          />
+        </View>
+      </SafeAreaView>
 
-              <Text style={styles.label}>PASSWORD:</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your Password"
-                placeholderTextColor="#9e8473"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
+      {/* Bottom pink panel with CTA buttons */}
+      <View style={styles.bottomPanel}>
+        <TouchableOpacity
+          style={styles.getStartedButton}
+          activeOpacity={0.85}
+          onPress={() => router.push("/signup")}
+        >
+          <Text style={styles.getStartedText}>Get Started</Text>
+        </TouchableOpacity>
 
-              <Text style={styles.label}>LOCATION:</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your Location"
-                placeholderTextColor="#9e8473"
-                value={location}
-                onChangeText={setLocation}
-              />
-            </View>
-
-            {/* LOGIN BUTTON */}
-            <TouchableOpacity
-              style={styles.loginButton}
-              onPress={handleLogin}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.buttonText}>Login</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.footerText}>
-              Analyzing current lost pet outreach deficiencies and mapping the
-              blueprint for instant neighborhood-wide communication.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.push("/login")}
+        >
+          <Text style={styles.loginText}>Log In</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#d8b69f', // Warm background matching design
+    backgroundColor: "#FFFFFF",
   },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 20,
+  bgPaw: {
+    position: "absolute",
+    opacity: 0.7,
   },
-  frameContainer: {
-    width: '100%',
-    alignItems: 'center',
+  content: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
   },
-
-  /* FRAME 1 STYLES */
-  largeLogoCircle: {
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor: '#ebd5c5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#cbb09d',
+  pinWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
-  appTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 6,
+  pinPawOverlay: {
+    position: "absolute",
+    top: 34,
   },
-  namePill: {
-    backgroundColor: '#c4aa97',
-    paddingHorizontal: 20,
-    paddingVertical: 4,
-    borderRadius: 15,
-    marginBottom: 60,
+  titleRow: {
+    flexDirection: "row",
+    marginTop: 8,
   },
-  namePillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#331800',
+  titleDark: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1A1A1A",
   },
-  enterButton: {
-    backgroundColor: '#9c6644',
-    width: '85%',
-    paddingVertical: 14,
-    borderRadius: 25,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#7d4a25',
+  titlePink: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: PINK,
   },
-
-  /* FRAME 2 STYLES */
-  smallLogoCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#ebd5c5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#cbb09d',
+  subtitle: {
+    marginTop: 14,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    color: "#777777",
   },
-  appTitleSmall: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 20,
+  trailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 28,
   },
-  inputGroup: {
-    width: '100%',
-    marginBottom: 16,
+  bottomPanel: {
+    backgroundColor: LIGHT_PINK,
+    borderTopLeftRadius: 90,
+    borderTopRightRadius: 90,
+    paddingTop: 40,
+    paddingBottom: 30,
+    paddingHorizontal: 32,
+    alignItems: "center",
   },
-  label: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#331800',
-    marginBottom: 4,
-    marginTop: 10,
+  getStartedButton: {
+    backgroundColor: "#1A1A1A",
+    width: "100%",
+    paddingVertical: 18,
+    borderRadius: 30,
+    alignItems: "center",
   },
-  input: {
-    backgroundColor: '#ebd5c5',
-    borderWidth: 1.5,
-    borderColor: '#7d4a25',
-    borderRadius: 25,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: '#331800',
-  },
-  loginButton: {
-    backgroundColor: '#9c6644',
-    width: '75%',
-    paddingVertical: 12,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#7d4a25',
-  },
-  buttonText: {
-    color: '#000000',
+  getStartedText: {
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "600",
   },
-  footerText: {
-    fontSize: 10,
-    color: '#444',
-    textAlign: 'center',
-    marginTop: 24,
-    lineHeight: 14,
-    paddingHorizontal: 10,
+  loginText: {
+    marginTop: 18,
+    color: PINK,
+    fontSize: 15,
+    fontWeight: "500",
   },
 });
