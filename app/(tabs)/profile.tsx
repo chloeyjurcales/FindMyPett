@@ -1,6 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import {
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const PINK = "#EE5C93";
@@ -34,13 +43,40 @@ const MENU_ITEMS: MenuItem[] = [
 export default function ProfileScreen() {
   const router = useRouter();
 
+  // TODO: once auth/profile is wired up, load & persist this to Supabase
+  // instead of keeping it as local screen state.
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+
   const handleMenuPress = (key: string) => {
     if (key === "logout") {
       // TODO: replace with a real Supabase signOut() call once auth is wired up
-      router.replace("/");
+      router.replace("/login");
       return;
     }
     // TODO: wire up navigation/functionality for the other menu items
+  };
+
+  const handlePickAvatar = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Please allow photo library access to change your profile photo.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: false,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      setAvatarUri(result.assets[0].uri);
+    }
   };
 
   return (
@@ -48,9 +84,24 @@ export default function ProfileScreen() {
       <Text style={styles.headerTitle}>Profile</Text>
 
       <View style={styles.avatarSection}>
-        <View style={styles.avatarCircle}>
-          <Ionicons name="paw" size={38} color="#FFFFFF" />
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={handlePickAvatar}
+          style={styles.avatarTouchable}
+        >
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarCircle}>
+              <Ionicons name="paw" size={38} color="#FFFFFF" />
+            </View>
+          )}
+
+          <View style={styles.avatarEditBadge}>
+            <Ionicons name="camera" size={14} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
         <Text style={styles.userName}>{CURRENT_USER.name}</Text>
         <View style={styles.locationRow}>
           <Ionicons name="location" size={14} color="#8A8A8A" />
@@ -112,11 +163,32 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 24,
   },
+  avatarTouchable: {
+    position: "relative",
+  },
   avatarCircle: {
     width: 90,
     height: 90,
     borderRadius: 45,
     backgroundColor: PINK,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: PINK,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },

@@ -3,29 +3,29 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { addPost, type ReportKind } from "../../store/posts-store";
 
 const PINK = "#EE5C93";
 const BORDER_GRAY = "#E3E3E3";
 const PLACEHOLDER_GRAY = "#A3A3A3";
 const MAX_PHOTOS = 5;
 
-type ReportKind = "Lost Pet" | "Found Pet";
-
 const PET_TYPES = ["Dog", "Cat", "Bird", "Rabbit", "Other"];
+const SEX_OPTIONS = ["Male", "Female", "Unknown"];
 
 const BREEDS_BY_TYPE: Record<string, string[]> = {
   Dog: ["Shih Tzu", "Aspin", "Labrador", "Poodle", "Chihuahua", "Other"],
@@ -44,12 +44,15 @@ export default function ReportScreen() {
   const [petName, setPetName] = useState("");
   const [petType, setPetType] = useState("");
   const [breed, setBreed] = useState("");
+  const [sex, setSex] = useState("");
   const [colorDescription, setColorDescription] = useState("");
+  const [description, setDescription] = useState("");
   const [lastSeenLocation, setLastSeenLocation] = useState("");
   const [dateTimeLostSeen, setDateTimeLostSeen] = useState("");
 
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [breedModalVisible, setBreedModalVisible] = useState(false);
+  const [sexModalVisible, setSexModalVisible] = useState(false);
 
   const breedOptions = petType ? (BREEDS_BY_TYPE[petType] ?? ["Other"]) : [];
 
@@ -85,11 +88,52 @@ export default function ReportScreen() {
     setPhotos((prev) => prev.filter((p) => p !== uri));
   };
 
+  const resetForm = () => {
+    setReportKind("Lost Pet");
+    setPhotos([]);
+    setPetName("");
+    setPetType("");
+    setBreed("");
+    setSex("");
+    setColorDescription("");
+    setDescription("");
+    setLastSeenLocation("");
+    setDateTimeLostSeen("");
+  };
+
   const handleSubmit = () => {
+    if (!petType) {
+      Alert.alert("Missing info", "Please select a Type of Pet.");
+      return;
+    }
+    if (!lastSeenLocation.trim()) {
+      Alert.alert("Missing info", "Please add a last seen / found location.");
+      return;
+    }
+
     // TODO: replace with an actual Supabase insert once your posts table exists
+    addPost({
+      kind: reportKind,
+      petName,
+      petType,
+      breed,
+      sex,
+      colorDescription,
+      description,
+      location: lastSeenLocation,
+      photos,
+    });
+
+    resetForm();
     Alert.alert(
-      "Report ready (preview)",
-      `${reportKind}\nName: ${petName || "—"}\nType: ${petType || "—"}\nBreed: ${breed || "—"}\nColor/Description: ${colorDescription || "—"}\nLast Seen: ${lastSeenLocation || "—"}\nDate/Time: ${dateTimeLostSeen || "—"}\nPhotos: ${photos.length}`,
+      "Report submitted",
+      "Your report is now visible on the Home screen.",
+      [
+        {
+          text: "OK",
+          onPress: () => router.replace("/(tabs)"),
+        },
+      ],
     );
   };
 
@@ -249,6 +293,24 @@ export default function ReportScreen() {
               />
             </TouchableOpacity>
 
+            {/* Sex */}
+            <TouchableOpacity
+              style={styles.dropdownInput}
+              activeOpacity={0.8}
+              onPress={() => setSexModalVisible(true)}
+            >
+              <Text
+                style={sex ? styles.dropdownValue : styles.dropdownPlaceholder}
+              >
+                {sex || "Sex"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={18}
+                color={PLACEHOLDER_GRAY}
+              />
+            </TouchableOpacity>
+
             {/* Color / Description */}
             <TextInput
               style={styles.input}
@@ -256,6 +318,18 @@ export default function ReportScreen() {
               placeholderTextColor={PLACEHOLDER_GRAY}
               value={colorDescription}
               onChangeText={setColorDescription}
+            />
+
+            {/* Description */}
+            <TextInput
+              style={styles.textArea}
+              placeholder="Description (optional)"
+              placeholderTextColor={PLACEHOLDER_GRAY}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
             />
 
             {/* Last Seen Location */}
@@ -317,6 +391,18 @@ export default function ReportScreen() {
           setBreedModalVisible(false);
         }}
         onClose={() => setBreedModalVisible(false)}
+      />
+
+      {/* Sex modal */}
+      <OptionModal
+        visible={sexModalVisible}
+        title="Sex"
+        options={SEX_OPTIONS}
+        onSelect={(value) => {
+          setSex(value);
+          setSexModalVisible(false);
+        }}
+        onClose={() => setSexModalVisible(false)}
       />
     </View>
   );
@@ -470,6 +556,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     height: 52,
+    fontSize: 14,
+    color: "#1A1A1A",
+    marginTop: 16,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: BORDER_GRAY,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 100,
     fontSize: 14,
     color: "#1A1A1A",
     marginTop: 16,

@@ -1,55 +1,37 @@
-import { useSyncExternalStore } from 'react';
-import type { ImageSourcePropType } from 'react-native';
+import { useSyncExternalStore } from "react";
 
-// Local avatar assets.
-const nadithAvatar = require('../assets/images/nadith.png');
-const klowieAvatar = require('../assets/images/klowe.png');
+export type ReportKind = "Lost Pet" | "Found Pet";
+
+export type Comment = {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: number;
+};
 
 export type Post = {
   id: string;
-  author: string;
+  kind: ReportKind;
+  petName: string;
+  petType: string;
+  breed: string;
+  sex: string;
+  colorDescription: string;
+  description: string;
   location: string;
-  imageUrl: string;
-  body: string;
+  photos: string[];
+  createdAt: number;
   likes: number;
   liked: boolean;
-  views: number;
-  authorAvatar?: ImageSourcePropType | string;
+  comments: Comment[];
 };
 
-export type CommentItem = {
-  id: string;
-  name: string;
-  avatar: string | ImageSourcePropType;
-  text: string;
-};
+// TODO: replace with the real signed-in user's name once auth is wired up
+const CURRENT_USER_NAME = "You";
 
 // ---- In-memory state (module-level so every screen shares it) ----
 
-let posts: Post[] = [
-  {
-    id: '1',
-    author: 'Junrel Alipogpog',
-    location: 'Banban, Bogo, Cebu • 3 hours ago',
-    imageUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=500',
-    body: 'Our dog went missing',
-    likes: 21,
-    liked: false,
-    views: 30,
-  },
-];
-
-let commentsByPostId: Record<string, CommentItem[]> = {
-  '1': [
-    {
-      id: 'c1',
-      name: 'Nadith Marie',
-      avatar: nadithAvatar,
-      text:
-        "hi, i think i saw your pet yesterday while i was riding my car near the parke in bogo city. i noticed it wandering around the area by itself. i wasn't able to stop for long, but i remembered it after seeing your post. maybe you can try checking around the terminal and nearby streets there. hoping you find your pet safe soon.",
-    },
-  ],
-};
+let posts: Post[] = [];
 
 const listeners = new Set<() => void>();
 
@@ -72,25 +54,44 @@ export function usePosts() {
   return useSyncExternalStore(subscribe, getPostsSnapshot, getPostsSnapshot);
 }
 
+export function usePostById(postId: string | undefined): Post | undefined {
+  const allPosts = usePosts();
+  return postId ? allPosts.find((p) => p.id === postId) : undefined;
+}
+
 export function getPostById(postId: string): Post | undefined {
   return posts.find((p) => p.id === postId);
 }
 
-export function addPost(params: { imageUri: string; caption: string }): Post {
+export function addPost(params: {
+  kind: ReportKind;
+  petName: string;
+  petType: string;
+  breed: string;
+  sex: string;
+  colorDescription: string;
+  description: string;
+  location: string;
+  photos: string[];
+}): Post {
   const newPost: Post = {
     id: Date.now().toString(),
-    author: 'Jurcales, Chloey Lyca',
-    location: 'Cebu, Philippines • Just now',
-    imageUrl: params.imageUri,
-    body: params.caption,
+    kind: params.kind,
+    petName: params.petName.trim(),
+    petType: params.petType,
+    breed: params.breed,
+    sex: params.sex,
+    colorDescription: params.colorDescription.trim(),
+    description: params.description.trim(),
+    location: params.location.trim(),
+    photos: params.photos,
+    createdAt: Date.now(),
     likes: 0,
     liked: false,
-    views: 0,
-    authorAvatar: klowieAvatar,
+    comments: [],
   };
 
   posts = [newPost, ...posts];
-  commentsByPostId = { ...commentsByPostId, [newPost.id]: [] };
   emitChange();
   return newPost;
 }
@@ -99,37 +100,47 @@ export function toggleLike(postId: string) {
   posts = posts.map((p) =>
     p.id === postId
       ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
-      : p
+      : p,
   );
   emitChange();
 }
 
 // ---- Comments ----
 
-function getCommentsSnapshot(postId: string) {
-  return commentsByPostId[postId] || [];
-}
-
-export function useComments(postId: string) {
-  return useSyncExternalStore(
-    (listener) => subscribe(listener),
-    () => getCommentsSnapshot(postId),
-    () => getCommentsSnapshot(postId)
-  );
-}
-
-export function addComment(postId: string, text: string) {
+export function addComment(
+  postId: string,
+  text: string,
+  author: string = CURRENT_USER_NAME,
+): Comment | undefined {
   const trimmed = text.trim();
-  if (!trimmed) return;
+  if (!trimmed) return undefined;
 
-  const newComment: CommentItem = {
-    id: `c${Date.now()}`,
-    name: 'You',
-    avatar: klowieAvatar,
+  const newComment: Comment = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    author,
     text: trimmed,
+    createdAt: Date.now(),
   };
 
-  const existing = commentsByPostId[postId] || [];
-  commentsByPostId = { ...commentsByPostId, [postId]: [...existing, newComment] };
+  posts = posts.map((p) =>
+    p.id === postId ? { ...p, comments: [...p.comments, newComment] } : p,
+  );
   emitChange();
+  return newComment;
+}
+
+// ---- Helpers ----
+
+export function getRelativeTime(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  const minutes = Math.floor(diffMs / 60000);
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }

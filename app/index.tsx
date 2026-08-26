@@ -1,114 +1,118 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Dimensions,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const PINK = "#EE5C93";
-const LIGHT_PINK = "#F9C9DB";
-const GRAY_PAW = "#EDEDED";
+const LIGHT_PINK = "#F9C9DD";
+const TEXT_GRAY = "#8A8A8A";
+
+const { width } = Dimensions.get("window");
+const WAVE_SIZE = width * 1.8;
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
   return (
     <View style={styles.container}>
-      {/* Decorative background paw prints */}
-      <Ionicons
-        name="paw"
-        size={26}
-        color={GRAY_PAW}
-        style={[
-          styles.bgPaw,
-          { top: 90, left: 40, transform: [{ rotate: "-20deg" }] },
-        ]}
-      />
-      <Ionicons
-        name="paw"
-        size={20}
-        color={GRAY_PAW}
-        style={[
-          styles.bgPaw,
-          { top: 60, right: 60, transform: [{ rotate: "15deg" }] },
-        ]}
-      />
+      {/* Scattered faint paw prints on the white area */}
       <Ionicons
         name="paw"
         size={22}
-        color={GRAY_PAW}
+        color="#EFEFEF"
         style={[
           styles.bgPaw,
-          { top: 220, right: 30, transform: [{ rotate: "-10deg" }] },
+          { top: 70, left: 40, transform: [{ rotate: "-15deg" }] },
         ]}
       />
       <Ionicons
         name="paw"
         size={18}
-        color={GRAY_PAW}
+        color="#EFEFEF"
         style={[
           styles.bgPaw,
-          { top: 260, left: 20, transform: [{ rotate: "25deg" }] },
+          { top: 110, right: 50, transform: [{ rotate: "20deg" }] },
         ]}
       />
       <Ionicons
         name="paw"
-        size={24}
-        color={GRAY_PAW}
+        size={16}
+        color="#EFEFEF"
         style={[
           styles.bgPaw,
-          { top: 480, left: 50, transform: [{ rotate: "10deg" }] },
+          { top: 200, left: 30, transform: [{ rotate: "10deg" }] },
+        ]}
+      />
+      <Ionicons
+        name="paw"
+        size={20}
+        color="#EFEFEF"
+        style={[
+          styles.bgPaw,
+          { top: 240, right: 40, transform: [{ rotate: "-25deg" }] },
         ]}
       />
 
-      <SafeAreaView style={styles.content}>
-        {/* Pin-shaped logo with paw + heart */}
-        <View style={styles.pinWrapper}>
-          <Ionicons name="location" size={130} color={PINK} />
-          <View style={styles.pinPawOverlay}>
-            <Ionicons name="paw" size={34} color="#fff" />
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+        {/* Top content */}
+        <View style={styles.topContent}>
+          <View style={styles.pinWrapper}>
+            <View style={styles.pinCircle}>
+              <Ionicons name="paw" size={36} color="#FFFFFF" />
+            </View>
+            <View style={styles.pinPoint} />
           </View>
+
+          <Text style={styles.title}>
+            Find<Text style={styles.titlePink}>My</Text>PetApp
+          </Text>
+          <Text style={styles.subtitle}>
+            Because every pet deserves to be home.
+          </Text>
         </View>
 
-        {/* App name */}
-        <View style={styles.titleRow}>
-          <Text style={styles.titleDark}>Find</Text>
-          <Text style={styles.titlePink}>My</Text>
-          <Text style={styles.titleDark}>PetApp</Text>
-        </View>
-
-        {/* Tagline */}
-        <Text style={styles.subtitle}>
-          Because every pet{"\n"}deserves to be home.
-        </Text>
-
-        {/* Small paw trail + heart accent */}
-        <View style={styles.trailRow}>
+        {/* Decorative heart + paw prints just above the wave */}
+        <View style={styles.decorationRow}>
+          <View style={styles.pawCluster}>
+            <Ionicons
+              name="paw"
+              size={20}
+              color={PINK}
+              style={{ transform: [{ rotate: "-10deg" }] }}
+            />
+            <Ionicons
+              name="paw"
+              size={16}
+              color={PINK}
+              style={{
+                marginLeft: 10,
+                marginTop: 10,
+                transform: [{ rotate: "12deg" }],
+              }}
+            />
+          </View>
           <Ionicons
-            name="paw"
-            size={22}
+            name="heart"
+            size={26}
             color={PINK}
-            style={{ transform: [{ rotate: "-15deg" }] }}
-          />
-          <Ionicons
-            name="paw"
-            size={16}
-            color={PINK}
-            style={{
-              marginLeft: 8,
-              marginTop: 22,
-              transform: [{ rotate: "10deg" }],
-            }}
-          />
-          <Ionicons
-            name="heart-outline"
-            size={30}
-            color={PINK}
-            style={{ marginLeft: 30 }}
+            style={styles.heartIcon}
           />
         </View>
       </SafeAreaView>
 
-      {/* Bottom pink panel with CTA buttons */}
-      <View style={styles.bottomPanel}>
+      {/* Pink wave */}
+      <View style={styles.waveContainer} pointerEvents="none">
+        <View style={styles.wave} />
+      </View>
+
+      {/* Buttons sitting on the pink area */}
+      <SafeAreaView style={styles.bottomButtons} edges={["bottom"]}>
         <TouchableOpacity
           style={styles.getStartedButton}
           activeOpacity={0.85}
@@ -123,7 +127,7 @@ export default function WelcomeScreen() {
         >
           <Text style={styles.loginText}>Log In</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     </View>
   );
 }
@@ -133,76 +137,111 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
+  safeArea: {
+    flex: 1,
+  },
   bgPaw: {
     position: "absolute",
-    opacity: 0.7,
   },
-  content: {
+  topContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
   },
   pinWrapper: {
     alignItems: "center",
+    marginBottom: 28,
+  },
+  pinCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: PINK,
+    alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
+    zIndex: 2,
   },
-  pinPawOverlay: {
-    position: "absolute",
-    top: 34,
+  pinPoint: {
+    width: 26,
+    height: 26,
+    backgroundColor: PINK,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 20,
+    transform: [{ rotate: "45deg" }],
+    marginTop: -16,
+    zIndex: 1,
   },
-  titleRow: {
-    flexDirection: "row",
-    marginTop: 8,
-  },
-  titleDark: {
-    fontSize: 28,
-    fontWeight: "700",
+  title: {
+    fontSize: 26,
+    fontWeight: "800",
     color: "#1A1A1A",
+    letterSpacing: 0.2,
   },
   titlePink: {
-    fontSize: 28,
-    fontWeight: "700",
     color: PINK,
   },
   subtitle: {
-    marginTop: 14,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    color: TEXT_GRAY,
+    marginTop: 10,
     textAlign: "center",
-    color: "#777777",
   },
-  trailRow: {
+  decorationRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 28,
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    paddingHorizontal: 50,
+    marginBottom: 130,
   },
-  bottomPanel: {
+  pawCluster: {
+    flexDirection: "row",
+  },
+  heartIcon: {
+    marginBottom: 6,
+  },
+  waveContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 210,
+    overflow: "hidden",
+  },
+  wave: {
+    position: "absolute",
+    bottom: -WAVE_SIZE * 0.72,
+    left: (width - WAVE_SIZE) / 2,
+    width: WAVE_SIZE,
+    height: WAVE_SIZE,
+    borderRadius: WAVE_SIZE / 2,
     backgroundColor: LIGHT_PINK,
-    borderTopLeftRadius: 90,
-    borderTopRightRadius: 90,
-    paddingTop: 40,
-    paddingBottom: 30,
-    paddingHorizontal: 32,
+  },
+  bottomButtons: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 28,
+    paddingBottom: 24,
     alignItems: "center",
   },
   getStartedButton: {
     backgroundColor: "#1A1A1A",
+    borderRadius: 28,
+    paddingVertical: 16,
     width: "100%",
-    paddingVertical: 18,
-    borderRadius: 30,
     alignItems: "center",
+    marginBottom: 16,
   },
   getStartedText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
   },
   loginText: {
-    marginTop: 18,
-    color: PINK,
-    fontSize: 15,
-    fontWeight: "500",
+    color: "#1A1A1A",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
