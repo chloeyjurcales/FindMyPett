@@ -78,11 +78,7 @@ export default function HomeScreen() {
         {/* Recent Posts section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Posts</Text>
-          <TouchableOpacity
-            onPress={() => {
-              // TODO: navigate to a full posts list once there are more posts
-            }}
-          >
+          <TouchableOpacity onPress={() => router.push("/all-posts")}>
             <Text style={styles.seeAllText}>See All</Text>
           </TouchableOpacity>
         </View>

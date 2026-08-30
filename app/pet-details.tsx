@@ -2,19 +2,30 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { addComment, getRelativeTime, usePostById } from "../store/posts-store";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { notifyPostOwner } from "../store/notifications-store";
+import {
+  addComment,
+  deleteComment,
+  deletePost,
+  getRelativeTime,
+  usePostById,
+} from "../store/posts-store";
+import { useUserProfile } from "../store/user-store";
 
 const PINK = "#EE5C93";
 const TEXT_DARK = "#1A1A1A";
@@ -24,8 +35,12 @@ export default function PetDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const post = usePostById(id);
+  const insets = useSafeAreaInsets();
+  const user = useUserProfile();
 
   const [commentText, setCommentText] = useState("");
+  const [isSendingComment, setIsSendingComment] = useState(false);
+  const [isReportingSighting, setIsReportingSighting] = useState(false);
 
   if (!post) {
     return (
@@ -54,11 +69,90 @@ export default function PetDetailsScreen() {
   const badgeLabel = `${isLost ? "LOST" : "FOUND"} ${post.petType.toUpperCase()}`;
   const subtitleParts = [post.breed || post.petType, post.sex].filter(Boolean);
   const locationPrefix = isLost ? "Last seen near" : "Found near";
+  const isOwnPost = !!user.id && post.authorId === user.id;
 
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     if (!commentText.trim()) return;
-    addComment(post.id, commentText);
-    setCommentText("");
+    setIsSendingComment(true);
+    try {
+      await addComment(post.id, commentText);
+      setCommentText("");
+    } catch (error: any) {
+      Alert.alert(
+        "Couldn't post comment",
+        error.message ?? "Please try again.",
+      );
+    } finally {
+      setIsSendingComment(false);
+    }
+  };
+
+  const handleDeletePost = () => {
+    Alert.alert(
+      "Delete this report?",
+      "This will permanently remove the post and its comments.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePost(post.id);
+              router.back();
+            } catch (error: any) {
+              Alert.alert(
+                "Couldn't delete report",
+                error.message ?? "Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    Alert.alert("Delete this comment?", "This can't be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteComment(post.id, commentId);
+          } catch (error: any) {
+            Alert.alert(
+              "Couldn't delete comment",
+              error.message ?? "Please try again.",
+            );
+          }
+        },
+      },
+    ]);
+  };
+
+  // Notifies the post owner that someone may have seen their pet. This is
+  // a no-op (silently skipped, not shown as an error) when you view your
+  // own post — you can't "see" your own missing pet.
+  const handleSeenPet = async () => {
+    setIsReportingSighting(true);
+    try {
+      await notifyPostOwner({
+        postId: post.id,
+        postOwnerId: post.authorId,
+        category: "Updates",
+        icon: "eye-outline",
+        title: `${user.name || "Someone"} may have seen ${post.petName || "your pet"}`,
+        subtitle: post.location ? `Near ${post.location}` : undefined,
+      });
+    } finally {
+      setIsReportingSighting(false);
+      Alert.alert(
+        "Thank you!",
+        "We'll let the owner know you may have seen this pet.",
+      );
+    }
   };
 
   return (
@@ -72,7 +166,16 @@ export default function PetDetailsScreen() {
           <Ionicons name="arrow-back" size={24} color={PINK} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pet Details</Text>
-        <View style={styles.backButton} />
+        {isOwnPost ? (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleDeletePost}
+          >
+            <Ionicons name="trash-outline" size={22} color={PINK} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backButton} />
+        )}
       </View>
 
       <KeyboardAvoidingView
@@ -133,14 +236,13 @@ export default function PetDetailsScreen() {
 
           {/* Action */}
           <TouchableOpacity
-            style={styles.seenButton}
+            style={[
+              styles.seenButton,
+              isReportingSighting && styles.seenButtonDisabled,
+            ]}
             activeOpacity={0.85}
-            onPress={() =>
-              Alert.alert(
-                "Thank you!",
-                "We'll let the owner know you may have seen this pet.",
-              )
-            }
+            onPress={handleSeenPet}
+            disabled={isReportingSighting}
           >
             <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
             <Text style={styles.seenButtonText}>I have Seen This Pet</Text>
@@ -157,30 +259,61 @@ export default function PetDetailsScreen() {
             </Text>
           ) : (
             <View style={styles.commentsList}>
-              {post.comments.map((comment) => (
-                <View key={comment.id} style={styles.commentRow}>
-                  <View style={styles.commentAvatar}>
-                    <Text style={styles.commentAvatarText}>
-                      {comment.author.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.commentBubble}>
-                    <View style={styles.commentHeaderRow}>
-                      <Text style={styles.commentAuthor}>{comment.author}</Text>
-                      <Text style={styles.commentTime}>
-                        {getRelativeTime(comment.createdAt)}
-                      </Text>
+              {post.comments.map((comment) => {
+                const isOwnComment = !!user.id && comment.authorId === user.id;
+                return (
+                  <View key={comment.id} style={styles.commentRow}>
+                    {comment.authorAvatarUrl ? (
+                      <Image
+                        source={{ uri: comment.authorAvatarUrl }}
+                        style={styles.commentAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.commentAvatar}>
+                        <Text style={styles.commentAvatarText}>
+                          {comment.authorName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.commentBubble}>
+                      <View style={styles.commentHeaderRow}>
+                        <Text style={styles.commentAuthor}>
+                          {comment.authorName}
+                        </Text>
+                        <View style={styles.commentHeaderRight}>
+                          <Text style={styles.commentTime}>
+                            {getRelativeTime(comment.createdAt)}
+                          </Text>
+                          {isOwnComment && (
+                            <TouchableOpacity
+                              onPress={() => handleDeleteComment(comment.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons
+                                name="trash-outline"
+                                size={14}
+                                color="#A3A3A3"
+                              />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                      <Text style={styles.commentText}>{comment.text}</Text>
                     </View>
-                    <Text style={styles.commentText}>{comment.text}</Text>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
         </ScrollView>
 
         {/* Comment input */}
-        <View style={styles.commentInputRow}>
+        <View
+          style={[
+            styles.commentInputRow,
+            { paddingBottom: Math.max(insets.bottom, 14) },
+          ]}
+        >
           <TextInput
             style={styles.commentInput}
             placeholder="Write a comment..."
@@ -192,11 +325,12 @@ export default function PetDetailsScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              !commentText.trim() && styles.sendButtonDisabled,
+              (!commentText.trim() || isSendingComment) &&
+                styles.sendButtonDisabled,
             ]}
             activeOpacity={0.8}
             onPress={handleSendComment}
-            disabled={!commentText.trim()}
+            disabled={!commentText.trim() || isSendingComment}
           >
             <Ionicons name="send" size={18} color="#FFFFFF" />
           </TouchableOpacity>
@@ -314,6 +448,9 @@ const styles = StyleSheet.create({
     paddingVertical: 17,
     marginTop: 30,
   },
+  seenButtonDisabled: {
+    backgroundColor: "#F0AFC7",
+  },
   seenButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
@@ -338,6 +475,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  commentAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
   commentAvatarText: {
     color: "#FFFFFF",
     fontSize: 13,
@@ -354,6 +496,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  commentHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   commentAuthor: {
     fontSize: 13,

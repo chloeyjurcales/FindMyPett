@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PINK = "#EE5C93";
 const ACTIVE = "#EE5C93";
@@ -21,13 +22,27 @@ function ReportTabButton(props: any) {
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
+  // Base tap-target height for the bar itself, on top of whatever extra
+  // space the phone's own system nav area (gesture bar / home indicator)
+  // needs. Without adding insets.bottom, the bar sits too close to that
+  // area and can overlap with it, making the icons hard to tap.
+  const TAB_BAR_CONTENT_HEIGHT = 58;
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: ACTIVE,
         tabBarInactiveTintColor: INACTIVE,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+            paddingBottom: Math.max(insets.bottom, 12),
+          },
+        ],
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
@@ -84,9 +99,7 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: "#1A1A1A",
     borderTopWidth: 0,
-    height: 78,
     paddingTop: 10,
-    paddingBottom: 18,
   },
   tabBarLabel: {
     fontSize: 11,

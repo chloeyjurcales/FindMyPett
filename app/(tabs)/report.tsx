@@ -53,6 +53,7 @@ export default function ReportScreen() {
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [breedModalVisible, setBreedModalVisible] = useState(false);
   const [sexModalVisible, setSexModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const breedOptions = petType ? (BREEDS_BY_TYPE[petType] ?? ["Other"]) : [];
 
@@ -101,7 +102,7 @@ export default function ReportScreen() {
     setDateTimeLostSeen("");
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!petType) {
       Alert.alert("Missing info", "Please select a Type of Pet.");
       return;
@@ -111,30 +112,40 @@ export default function ReportScreen() {
       return;
     }
 
-    // TODO: replace with an actual Supabase insert once your posts table exists
-    addPost({
-      kind: reportKind,
-      petName,
-      petType,
-      breed,
-      sex,
-      colorDescription,
-      description,
-      location: lastSeenLocation,
-      photos,
-    });
+    setIsSubmitting(true);
 
-    resetForm();
-    Alert.alert(
-      "Report submitted",
-      "Your report is now visible on the Home screen.",
-      [
-        {
-          text: "OK",
-          onPress: () => router.replace("/(tabs)"),
-        },
-      ],
-    );
+    try {
+      await addPost({
+        kind: reportKind,
+        petName,
+        petType,
+        breed,
+        sex,
+        colorDescription,
+        description,
+        location: lastSeenLocation,
+        photos,
+      });
+
+      resetForm();
+      Alert.alert(
+        "Report submitted",
+        "Your report is now visible on the Home screen.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.replace("/(tabs)"),
+          },
+        ],
+      );
+    } catch (error: any) {
+      Alert.alert(
+        "Couldn't submit report",
+        error.message ?? "Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -358,11 +369,17 @@ export default function ReportScreen() {
 
             {/* Submit */}
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[
+                styles.submitButton,
+                isSubmitting && styles.submitButtonDisabled,
+              ]}
               activeOpacity={0.85}
               onPress={handleSubmit}
+              disabled={isSubmitting}
             >
-              <Text style={styles.submitButtonText}>Submit Report</Text>
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? "Submitting..." : "Submit Report"}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -619,6 +636,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   modalOverlay: {
     flex: 1,

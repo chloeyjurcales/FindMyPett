@@ -1,22 +1,84 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { getRelativeTime, toggleLike, type Post } from "../store/posts-store";
+import {
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import {
+  deletePost,
+  getRelativeTime,
+  toggleLike,
+  type Post,
+} from "../store/posts-store";
+import { useUserProfile } from "../store/user-store";
 
 const PINK = "#EE5C93";
+const ICON_BG_PINK = "#F9D7E4";
 
 export function PostCard({ post }: { post: Post }) {
   const router = useRouter();
+  const user = useUserProfile();
   const isLost = post.kind === "Lost Pet";
   const badgeLabel = `${isLost ? "LOST" : "FOUND"} ${post.petType.toUpperCase()}`;
   const subtitleParts = [post.breed || post.petType, post.sex].filter(Boolean);
   const locationPrefix = isLost ? "Last seen near" : "Found near";
+  const isOwnPost = !!user.id && post.authorId === user.id;
+  const authorInitial = (post.authorName || "?").charAt(0).toUpperCase();
 
   const goToDetails = () =>
     router.push({ pathname: "/pet-details", params: { id: post.id } });
 
+  const handleDeletePost = () => {
+    Alert.alert(
+      "Delete this report?",
+      "This will permanently remove the post and its comments.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePost(post.id);
+            } catch (error: any) {
+              Alert.alert(
+                "Couldn't delete report",
+                error.message ?? "Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.card}>
+      {/* Author header (avatar + name) — same fields already shown on comments */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={goToDetails}
+        style={styles.authorRow}
+      >
+        {post.authorAvatarUrl ? (
+          <Image
+            source={{ uri: post.authorAvatarUrl }}
+            style={styles.authorAvatarImage}
+          />
+        ) : (
+          <View style={styles.authorAvatarInitialCircle}>
+            <Text style={styles.authorAvatarInitialText}>{authorInitial}</Text>
+          </View>
+        )}
+        <Text style={styles.authorName} numberOfLines={1}>
+          {post.authorName}
+        </Text>
+      </TouchableOpacity>
+
       <TouchableOpacity activeOpacity={0.85} onPress={goToDetails}>
         <View style={styles.cardImageWrapper}>
           {post.photos.length > 0 ? (
@@ -29,6 +91,16 @@ export function PostCard({ post }: { post: Post }) {
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{badgeLabel}</Text>
           </View>
+
+          {isOwnPost && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleDeletePost}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.cardBody}>
@@ -88,6 +160,39 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
   },
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+  authorAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
+  },
+  authorAvatarInitialCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: ICON_BG_PINK,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  authorAvatarInitialText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: PINK,
+  },
+  authorName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    flexShrink: 1,
+  },
   cardImageWrapper: {
     position: "relative",
   },
@@ -114,6 +219,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.3,
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardBody: {
     paddingHorizontal: 14,

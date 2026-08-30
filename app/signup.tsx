@@ -2,16 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../lib/supabase";
 
 const PINK = "#EE5C93";
 const LIGHT_PINK = "#F6BFD6";
@@ -27,6 +29,59 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSignUp = async () => {
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName || !trimmedEmail || !password || !confirmPassword) {
+      Alert.alert("Missing info", "Please fill in every field.");
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert("Password too short", "Use at least 6 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Passwords don't match", "Please re-enter your password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // `data: { name }` is stored in the auth user's metadata. The
+    // handle_new_user() trigger in your Supabase schema reads this to
+    // create the matching row in the profiles table automatically.
+    const { data, error } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password,
+      options: {
+        data: { name: trimmedName },
+      },
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      Alert.alert("Sign up failed", error.message);
+      return;
+    }
+
+    if (data.session) {
+      // Email confirmation is off in your Supabase project's Auth settings,
+      // so the account is signed in immediately.
+      router.replace("/(tabs)");
+      return;
+    }
+
+    // Email confirmation is on: there's an account, but no session yet.
+    Alert.alert(
+      "Check your email",
+      "We sent you a confirmation link. Verify your email, then log in.",
+    );
+    router.replace("/login");
+  };
 
   return (
     <View style={styles.container}>
@@ -146,13 +201,17 @@ export default function SignUpScreen() {
 
             {/* Sign Up button */}
             <TouchableOpacity
-              style={styles.signUpButton}
+              style={[
+                styles.signUpButton,
+                isSubmitting && styles.buttonDisabled,
+              ]}
               activeOpacity={0.85}
-              onPress={() => {
-                // TODO: wire this up to your auth / account-creation logic
-              }}
+              onPress={handleSignUp}
+              disabled={isSubmitting}
             >
-              <Text style={styles.signUpButtonText}>Sign Up</Text>
+              <Text style={styles.signUpButtonText}>
+                {isSubmitting ? "Creating account..." : "Sign Up"}
+              </Text>
             </TouchableOpacity>
 
             {/* Divider */}
@@ -274,6 +333,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   dividerRow: {
     flexDirection: "row",

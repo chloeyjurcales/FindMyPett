@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   StyleSheet,
@@ -11,14 +12,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../lib/supabase";
+import { setUserAvatar, useUserProfile } from "../../store/user-store";
 
 const PINK = "#EE5C93";
-
-// TODO: replace with the real signed-in user's data from Supabase auth/profile
-const CURRENT_USER = {
-  name: "Alexandra Santos",
-  location: "Bogo City, Cebu",
-};
 
 type MenuItem = {
   key: string;
@@ -36,21 +33,34 @@ const MENU_ITEMS: MenuItem[] = [
     icon: "notifications-outline",
   },
   { key: "settings", label: "Settings", icon: "settings-outline" },
-  { key: "help", label: "Help Center", icon: "help-circle-outline" },
   { key: "logout", label: "Log Out", icon: "log-out-outline", danger: true },
 ];
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const user = useUserProfile();
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  // TODO: once auth/profile is wired up, load & persist this to Supabase
-  // instead of keeping it as local screen state.
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
-
-  const handleMenuPress = (key: string) => {
+  const handleMenuPress = async (key: string) => {
     if (key === "logout") {
-      // TODO: replace with a real Supabase signOut() call once auth is wired up
+      await supabase.auth.signOut();
       router.replace("/login");
+      return;
+    }
+    if (key === "reports") {
+      router.push("/my-reports");
+      return;
+    }
+    if (key === "saved") {
+      router.push("/saved-pets");
+      return;
+    }
+    if (key === "notifications") {
+      router.push("/(tabs)/alerts");
+      return;
+    }
+    if (key === "settings") {
+      router.push("/settings");
       return;
     }
     // TODO: wire up navigation/functionality for the other menu items
@@ -75,7 +85,17 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      setAvatarUri(result.assets[0].uri);
+      setIsUploadingAvatar(true);
+      try {
+        await setUserAvatar(result.assets[0].uri);
+      } catch (error: any) {
+        Alert.alert(
+          "Couldn't update photo",
+          error.message ?? "Please try again.",
+        );
+      } finally {
+        setIsUploadingAvatar(false);
+      }
     }
   };
 
@@ -88,24 +108,36 @@ export default function ProfileScreen() {
           activeOpacity={0.8}
           onPress={handlePickAvatar}
           style={styles.avatarTouchable}
+          disabled={isUploadingAvatar}
         >
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          {user.avatarUri ? (
+            <Image
+              source={{ uri: user.avatarUri }}
+              style={styles.avatarImage}
+            />
           ) : (
             <View style={styles.avatarCircle}>
               <Ionicons name="paw" size={38} color="#FFFFFF" />
             </View>
           )}
 
-          <View style={styles.avatarEditBadge}>
-            <Ionicons name="camera" size={14} color="#FFFFFF" />
-          </View>
+          {isUploadingAvatar ? (
+            <View style={styles.avatarUploadingOverlay}>
+              <ActivityIndicator color="#FFFFFF" />
+            </View>
+          ) : (
+            <View style={styles.avatarEditBadge}>
+              <Ionicons name="camera" size={14} color="#FFFFFF" />
+            </View>
+          )}
         </TouchableOpacity>
 
-        <Text style={styles.userName}>{CURRENT_USER.name}</Text>
+        <Text style={styles.userName}>{user.name || "Your Name"}</Text>
         <View style={styles.locationRow}>
           <Ionicons name="location" size={14} color="#8A8A8A" />
-          <Text style={styles.locationText}>{CURRENT_USER.location}</Text>
+          <Text style={styles.locationText}>
+            {user.location || "Add your location"}
+          </Text>
         </View>
       </View>
 
@@ -189,6 +221,17 @@ const styles = StyleSheet.create({
     backgroundColor: PINK,
     borderWidth: 2,
     borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarUploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "rgba(0,0,0,0.4)",
     alignItems: "center",
     justifyContent: "center",
   },

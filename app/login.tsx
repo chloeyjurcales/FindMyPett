@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../lib/supabase";
 
 const PINK = "#EE5C93";
 const LIGHT_PINK = "#F6BFD6";
@@ -24,6 +26,32 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleLogin = async () => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
+      Alert.alert("Missing info", "Please enter your email and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password,
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      Alert.alert("Log in failed", error.message);
+      return;
+    }
+
+    router.replace("/(tabs)");
+  };
 
   return (
     <View style={styles.container}>
@@ -106,16 +134,17 @@ export default function LoginScreen() {
 
             {/* Log In button */}
             <TouchableOpacity
-              style={styles.loginButton}
+              style={[
+                styles.loginButton,
+                isSubmitting && styles.buttonDisabled,
+              ]}
               activeOpacity={0.85}
-              onPress={() => {
-                // TODO: replace with real Supabase auth check once your
-                // auth/table setup is ready. For now this just navigates
-                // straight to the Home tabs on tap.
-                router.replace("/(tabs)");
-              }}
+              onPress={handleLogin}
+              disabled={isSubmitting}
             >
-              <Text style={styles.loginButtonText}>Log In</Text>
+              <Text style={styles.loginButtonText}>
+                {isSubmitting ? "Logging in..." : "Log In"}
+              </Text>
             </TouchableOpacity>
 
             {/* Divider */}
@@ -228,6 +257,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   dividerRow: {
     flexDirection: "row",

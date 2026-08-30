@@ -29,21 +29,17 @@ type FilterKey = "All" | "Lost" | "Found" | "Dogs" | "Cats";
 const QUICK_FILTERS: FilterKey[] = ["All", "Lost", "Found", "Dogs", "Cats"];
 
 // TODO: replace with the real signed-in user's saved/selected location
-const CURRENT_LOCATION = "Bogo City, Cebu";
+const DEFAULT_LOCATION = "";
 
 // TODO: persist real recent searches per user instead of local screen state
-const INITIAL_RECENT_SEARCHES = [
-  "Shih Tzu",
-  "Brown Dog",
-  "Poblacion",
-  "White Cat",
-];
+const INITIAL_RECENT_SEARCHES: string[] = [];
 
 export default function SearchScreen() {
   const posts = usePosts();
 
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterKey>("All");
+  const [currentLocation, setCurrentLocation] = useState(DEFAULT_LOCATION);
   const [recentSearches, setRecentSearches] = useState<string[]>(
     INITIAL_RECENT_SEARCHES,
   );
@@ -184,11 +180,14 @@ export default function SearchScreen() {
             {/* Location */}
             <View style={styles.locationRow}>
               <Ionicons name="location" size={16} color={PINK} />
-              <Text style={styles.locationText}>{CURRENT_LOCATION}</Text>
+              <Text style={styles.locationText}>
+                {currentLocation || "Set your location"}
+              </Text>
               <TouchableOpacity
                 style={styles.changeButton}
                 onPress={() => {
-                  // TODO: open location picker once available
+                  // TODO: open location picker once available and call
+                  // setCurrentLocation(...) with the user's real selection
                 }}
               >
                 <Text style={styles.changeText}>Change</Text>
@@ -304,13 +303,8 @@ function SearchResultRow({ post }: { post: Post }) {
         )}
 
         <View style={styles.resultFooterRow}>
-          <View style={styles.resultDistanceRow}>
-            <Ionicons name="location-outline" size={11} color={TEXT_GRAY} />
-            {/* TODO: replace with real distance once user geolocation is wired up */}
-            <Text style={styles.resultDistanceText}>
-              {getPlaceholderDistance(post.id)} away
-            </Text>
-          </View>
+          {/* TODO: show real distance once user geolocation is wired up */}
+          <View style={styles.resultDistanceRow} />
           <Text style={styles.resultTime}>
             {getRelativeTime(post.createdAt)}
           </Text>
@@ -318,13 +312,6 @@ function SearchResultRow({ post }: { post: Post }) {
       </View>
     </TouchableOpacity>
   );
-}
-
-// TODO: temporary stand-in until real geolocation-based distance is available
-function getPlaceholderDistance(id: string): string {
-  const seed = Array.from(id).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  const km = ((seed % 30) + 1) / 10;
-  return `${km.toFixed(1)} km`;
 }
 
 const styles = StyleSheet.create({
