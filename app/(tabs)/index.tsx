@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Image,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { SideMenu } from "../../components/side-menu";
 import {
   getRelativeTime,
   toggleLike,
@@ -23,16 +25,13 @@ const TEXT_GRAY = "#7A7A7A";
 export default function HomeScreen() {
   const router = useRouter();
   const posts = usePosts();
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => {
-            // TODO: wire up side menu/drawer later
-          }}
-        >
+        <TouchableOpacity onPress={() => setIsMenuVisible(true)}>
           <Ionicons name="menu" size={26} color="#1A1A1A" />
         </TouchableOpacity>
 
@@ -42,6 +41,11 @@ export default function HomeScreen() {
           <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
         </TouchableOpacity>
       </View>
+
+      <SideMenu
+        visible={isMenuVisible}
+        onClose={() => setIsMenuVisible(false)}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -260,12 +264,11 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     paddingVertical: 50,
-    paddingHorizontal: 20,
   },
   emptyTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#8A8A8A",
+    color: "#1A1A1A",
     marginTop: 12,
   },
   emptySubtitle: {

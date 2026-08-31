@@ -47,13 +47,19 @@ export default function ReportScreen() {
   const [sex, setSex] = useState("");
   const [colorDescription, setColorDescription] = useState("");
   const [description, setDescription] = useState("");
-  const [lastSeenLocation, setLastSeenLocation] = useState("");
+  const [locationText, setLocationText] = useState("");
   const [dateTimeLostSeen, setDateTimeLostSeen] = useState("");
+  const [claimLocation, setClaimLocation] = useState("");
 
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [breedModalVisible, setBreedModalVisible] = useState(false);
   const [sexModalVisible, setSexModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isFoundPet = reportKind === "Found Pet";
+  const locationLabel = isFoundPet
+    ? "Where You Found the Pet"
+    : "Last Seen Location";
 
   const breedOptions = petType ? (BREEDS_BY_TYPE[petType] ?? ["Other"]) : [];
 
@@ -98,8 +104,9 @@ export default function ReportScreen() {
     setSex("");
     setColorDescription("");
     setDescription("");
-    setLastSeenLocation("");
+    setLocationText("");
     setDateTimeLostSeen("");
+    setClaimLocation("");
   };
 
   const handleSubmit = async () => {
@@ -107,8 +114,13 @@ export default function ReportScreen() {
       Alert.alert("Missing info", "Please select a Type of Pet.");
       return;
     }
-    if (!lastSeenLocation.trim()) {
-      Alert.alert("Missing info", "Please add a last seen / found location.");
+    if (!locationText.trim()) {
+      Alert.alert(
+        "Missing info",
+        isFoundPet
+          ? "Please add where you found the pet."
+          : "Please add a last seen location.",
+      );
       return;
     }
 
@@ -123,7 +135,8 @@ export default function ReportScreen() {
         sex,
         colorDescription,
         description,
-        location: lastSeenLocation,
+        location: locationText,
+        claimLocation: isFoundPet ? claimLocation : undefined,
         photos,
       });
 
@@ -343,29 +356,43 @@ export default function ReportScreen() {
               textAlignVertical="top"
             />
 
-            {/* Last Seen Location */}
+            {/* Last Seen / Where Found Location */}
             <View style={styles.inputWithIcon}>
               <TextInput
                 style={styles.inputFlex}
-                placeholder="Last Seen Location"
+                placeholder={locationLabel}
                 placeholderTextColor={PLACEHOLDER_GRAY}
-                value={lastSeenLocation}
-                onChangeText={setLastSeenLocation}
+                value={locationText}
+                onChangeText={setLocationText}
               />
               <Ionicons name="location-outline" size={20} color={PINK} />
             </View>
 
-            {/* Date & Time Lost Seen */}
-            <View style={styles.inputWithIcon}>
-              <TextInput
-                style={styles.inputFlex}
-                placeholder="Date & Time Lost Seen"
-                placeholderTextColor={PLACEHOLDER_GRAY}
-                value={dateTimeLostSeen}
-                onChangeText={setDateTimeLostSeen}
-              />
-              <Ionicons name="calendar-outline" size={20} color={PINK} />
-            </View>
+            {isFoundPet ? (
+              /* Where to Claim — only relevant when reporting a pet you found */
+              <View style={styles.inputWithIcon}>
+                <TextInput
+                  style={styles.inputFlex}
+                  placeholder="Where to Claim (e.g. address, barangay hall)"
+                  placeholderTextColor={PLACEHOLDER_GRAY}
+                  value={claimLocation}
+                  onChangeText={setClaimLocation}
+                />
+                <Ionicons name="flag-outline" size={20} color={PINK} />
+              </View>
+            ) : (
+              /* Date & Time Lost Seen — only relevant for a lost pet */
+              <View style={styles.inputWithIcon}>
+                <TextInput
+                  style={styles.inputFlex}
+                  placeholder="Date & Time Lost Seen"
+                  placeholderTextColor={PLACEHOLDER_GRAY}
+                  value={dateTimeLostSeen}
+                  onChangeText={setDateTimeLostSeen}
+                />
+                <Ionicons name="calendar-outline" size={20} color={PINK} />
+              </View>
+            )}
 
             {/* Submit */}
             <TouchableOpacity

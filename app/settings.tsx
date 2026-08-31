@@ -16,6 +16,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../lib/supabase";
 import {
     setUserAvatar,
     setUserLocation,
@@ -42,6 +43,7 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const handleSaveName = async () => {
     if (!name.trim()) {
@@ -105,7 +107,12 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleChangePassword = () => {
+  // Changes the signed-in user's password. Supabase's updateUser() doesn't
+  // ask for the current password on its own (an active session is enough),
+  // so to actually honor the "Current Password" field and catch typos,
+  // we first re-verify it with signInWithPassword() before applying the
+  // new one.
+  const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert("Missing info", "Please fill in all three password fields.");
       return;
@@ -125,12 +132,48 @@ export default function SettingsScreen() {
       return;
     }
 
-    // TODO: replace with a real Supabase updateUser({ password }) call once
-    // auth is wired up. For now this just confirms locally and resets the form.
-    Alert.alert("Password updated", "Your password has been changed.");
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
+    setIsChangingPassword(true);
+    try {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!authUser?.email) {
+        Alert.alert("Couldn't change password", "You're not signed in.");
+        return;
+      }
+
+      // Step 1: confirm the current password is actually correct.
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: authUser.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        Alert.alert(
+          "Incorrect password",
+          "Your current password doesn't match. Please try again.",
+        );
+        return;
+      }
+
+      // Step 2: apply the new password.
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        Alert.alert("Couldn't update password", updateError.message);
+        return;
+      }
+
+      Alert.alert("Password updated", "Your password has been changed.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -336,11 +379,17 @@ export default function SettingsScreen() {
               </View>
 
               <TouchableOpacity
-                style={styles.saveButton}
+                style={[
+                  styles.saveButton,
+                  isChangingPassword && styles.saveButtonDisabled,
+                ]}
                 activeOpacity={0.85}
                 onPress={handleChangePassword}
+                disabled={isChangingPassword}
               >
-                <Text style={styles.saveButtonText}>Save Changes</Text>
+                <Text style={styles.saveButtonText}>
+                  {isChangingPassword ? "Saving..." : "Save Changes"}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -479,6 +528,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 14,
     alignItems: "center",
+  },
+  saveButtonDisabled: {
+    backgroundColor: "#F0AFC7",
   },
   saveButtonText: {
     color: "#FFFFFF",

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
@@ -36,6 +37,7 @@ export default function UserProfileScreen() {
   const [profile, setProfile] = useState<ViewedProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isAvatarZoomVisible, setIsAvatarZoomVisible] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,16 +109,21 @@ export default function UserProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.profileSection}>
-            {profile.avatarUrl ? (
-              <Image
-                source={{ uri: profile.avatarUrl }}
-                style={styles.avatarImage}
-              />
-            ) : (
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarInitialText}>{initial}</Text>
-              </View>
-            )}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setIsAvatarZoomVisible(true)}
+            >
+              {profile.avatarUrl ? (
+                <Image
+                  source={{ uri: profile.avatarUrl }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarInitialText}>{initial}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
             <Text style={styles.userName}>{profile.name}</Text>
 
@@ -162,6 +169,40 @@ export default function UserProfileScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Tapping the avatar opens it full-screen, zoomed in */}
+      <Modal
+        visible={isAvatarZoomVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsAvatarZoomVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.zoomOverlay}
+          activeOpacity={1}
+          onPress={() => setIsAvatarZoomVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.zoomCloseButton}
+            onPress={() => setIsAvatarZoomVisible(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {profile?.avatarUrl ? (
+            <Image
+              source={{ uri: profile.avatarUrl }}
+              style={styles.zoomImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.zoomAvatarCircle}>
+              <Text style={styles.zoomAvatarInitialText}>{initial}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -274,5 +315,38 @@ const styles = StyleSheet.create({
     color: TEXT_GRAY,
     textAlign: "center",
     paddingHorizontal: 20,
+  },
+  zoomOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomCloseButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  zoomImage: {
+    width: "100%",
+    height: "70%",
+  },
+  zoomAvatarCircle: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: PINK,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomAvatarInitialText: {
+    fontSize: 80,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

@@ -162,25 +162,25 @@ export default function LoginScreen() {
             >
               <Text style={styles.createAccountText}>Create an Account</Text>
             </TouchableOpacity>
-          </ScrollView>
 
-          {/* Skyline + city banner */}
-          <View style={styles.skylineWrapper}>
-            <View style={styles.skylineRow}>
-              {[38, 60, 46, 80, 54, 70, 42, 64, 50, 36].map((h, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.building,
-                    { height: h, opacity: i % 2 === 0 ? 0.55 : 0.8 },
-                  ]}
-                />
-              ))}
+            {/* Skyline + city banner */}
+            <View style={styles.skylineWrapper}>
+              <View style={styles.skylineRow}>
+                {[38, 60, 46, 80, 54, 70, 42, 64, 50, 36].map((h, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.building,
+                      { height: h, opacity: i % 2 === 0 ? 0.55 : 0.8 },
+                    ]}
+                  />
+                ))}
+              </View>
+              <View style={styles.cityStrip}>
+                <Text style={styles.cityText}>BOGO CITY, CEBU</Text>
+              </View>
             </View>
-            <View style={styles.cityStrip}>
-              <Text style={styles.cityText}>BOGO CITY, CEBU</Text>
-            </View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
     </View>
@@ -194,9 +194,10 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    justifyContent: "space-between",
   },
   scrollContent: {
+    flexGrow: 1,
+    justifyContent: "space-between",
     paddingHorizontal: 24,
     paddingTop: 8,
   },
@@ -291,6 +292,7 @@ const styles = StyleSheet.create({
   },
   skylineWrapper: {
     marginTop: 24,
+    marginHorizontal: -24,
   },
   skylineRow: {
     flexDirection: "row",

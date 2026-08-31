@@ -3,8 +3,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
+  Dimensions,
+  FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -30,6 +33,7 @@ import { useUserProfile } from "../store/user-store";
 const PINK = "#EE5C93";
 const TEXT_DARK = "#1A1A1A";
 const TEXT_GRAY = "#5C5C5C";
+const PHOTO_WIDTH = Dimensions.get("window").width - 40;
 
 export default function PetDetailsScreen() {
   const router = useRouter();
@@ -41,6 +45,9 @@ export default function PetDetailsScreen() {
   const [commentText, setCommentText] = useState("");
   const [isSendingComment, setIsSendingComment] = useState(false);
   const [isReportingSighting, setIsReportingSighting] = useState(false);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [seenModalVisible, setSeenModalVisible] = useState(false);
+  const [sightingLocation, setSightingLocation] = useState("");
 
   const goToUserProfile = (userId: string) =>
     router.push({ pathname: "/user-profile", params: { userId } });
@@ -135,10 +142,17 @@ export default function PetDetailsScreen() {
     ]);
   };
 
-  // Notifies the post owner that someone may have seen their pet. This is
-  // a no-op (silently skipped, not shown as an error) when you view your
-  // own post — you can't "see" your own missing pet.
+  // Notifies the post owner that someone may have seen their pet, including
+  // the location the person entered for where they saw it. This is a no-op
+  // (silently skipped, not shown as an error) when you view your own post —
+  // you can't "see" your own missing pet.
   const handleSeenPet = async () => {
+    const trimmedLocation = sightingLocation.trim();
+    if (!trimmedLocation) {
+      Alert.alert("Missing info", "Please enter where you saw the pet.");
+      return;
+    }
+
     setIsReportingSighting(true);
     try {
       await notifyPostOwner({
@@ -147,10 +161,12 @@ export default function PetDetailsScreen() {
         category: "Updates",
         icon: "eye-outline",
         title: `${user.name || "Someone"} may have seen ${post.petName || "your pet"}`,
-        subtitle: post.location ? `Near ${post.location}` : undefined,
+        subtitle: `Spotted near ${trimmedLocation}`,
       });
     } finally {
       setIsReportingSighting(false);
+      setSeenModalVisible(false);
+      setSightingLocation("");
       Alert.alert(
         "Thank you!",
         "We'll let the owner know you may have seen this pet.",
@@ -187,6 +203,7 @@ export default function PetDetailsScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -211,12 +228,37 @@ export default function PetDetailsScreen() {
             <Text style={styles.authorNameText}>{post.authorName}</Text>
           </TouchableOpacity>
 
-          {/* Photo */}
+          {/* Photo(s) */}
           <View style={styles.imageWrapper}>
             {post.photos.length > 0 ? (
-              <Image source={{ uri: post.photos[0] }} style={styles.image} />
+              <FlatList
+                data={post.photos}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, index) => `${item}-${index}`}
+                scrollEventThrottle={16}
+                onScroll={(e) => {
+                  const index = Math.round(
+                    e.nativeEvent.contentOffset.x / PHOTO_WIDTH,
+                  );
+                  setActivePhotoIndex(index);
+                }}
+                renderItem={({ item }) => (
+                  <Image
+                    source={{ uri: item }}
+                    style={[styles.image, { width: PHOTO_WIDTH }]}
+                  />
+                )}
+              />
             ) : (
-              <View style={[styles.image, styles.imagePlaceholder]}>
+              <View
+                style={[
+                  styles.image,
+                  styles.imagePlaceholder,
+                  { width: PHOTO_WIDTH },
+                ]}
+              >
                 <Ionicons name="paw" size={40} color="#C9C9C9" />
               </View>
             )}
@@ -228,6 +270,28 @@ export default function PetDetailsScreen() {
             <Text style={styles.imageTime}>
               {getRelativeTime(post.createdAt)}
             </Text>
+
+            {post.photos.length > 1 && (
+              <View style={styles.dotsRow}>
+                {post.photos.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.dot,
+                      index === activePhotoIndex && styles.dotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+
+            {post.photos.length > 1 && (
+              <View style={styles.photoCountBadge}>
+                <Text style={styles.photoCountText}>
+                  {activePhotoIndex + 1}/{post.photos.length}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Name */}
@@ -250,6 +314,15 @@ export default function PetDetailsScreen() {
             </View>
           )}
 
+          {!!post.claimLocation && (
+            <View style={styles.locationRow}>
+              <Ionicons name="flag" size={16} color={PINK} />
+              <Text style={styles.locationText}>
+                Where to claim: {post.claimLocation}
+              </Text>
+            </View>
+          )}
+
           {/* Description */}
           {!!post.description && (
             <>
@@ -265,7 +338,7 @@ export default function PetDetailsScreen() {
               isReportingSighting && styles.seenButtonDisabled,
             ]}
             activeOpacity={0.85}
-            onPress={handleSeenPet}
+            onPress={() => setSeenModalVisible(true)}
             disabled={isReportingSighting}
           >
             <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
@@ -370,6 +443,62 @@ export default function PetDetailsScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* "I have Seen This Pet" — asks where the pet was seen before notifying the owner */}
+      <Modal
+        visible={seenModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSeenModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setSeenModalVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalSheet}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.modalTitle}>Where did you see this pet?</Text>
+              <Text style={styles.modalSubtitle}>
+                This location will be sent to {post.authorName} along with your
+                report.
+              </Text>
+              <View style={styles.modalInputWrapper}>
+                <Ionicons name="location-outline" size={20} color={PINK} />
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Near the barangay hall, Poblacion"
+                  placeholderTextColor="#A3A3A3"
+                  value={sightingLocation}
+                  onChangeText={setSightingLocation}
+                  autoFocus
+                />
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmitButton,
+                  (!sightingLocation.trim() || isReportingSighting) &&
+                    styles.seenButtonDisabled,
+                ]}
+                activeOpacity={0.85}
+                onPress={handleSeenPet}
+                disabled={!sightingLocation.trim() || isReportingSighting}
+              >
+                <Text style={styles.modalSubmitButtonText}>
+                  {isReportingSighting ? "Sending..." : "Notify Owner"}
+                </Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -467,6 +596,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#FFFFFF",
     fontWeight: "600",
+  },
+  dotsRow: {
+    position: "absolute",
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
+  dotActive: {
+    backgroundColor: "#FFFFFF",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  photoCountBadge: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  photoCountText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
   },
   name: {
     fontSize: 22,
@@ -625,5 +790,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: TEXT_GRAY,
     textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: TEXT_DARK,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: TEXT_GRAY,
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  modalInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E3E3E3",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 52,
+    marginTop: 18,
+    gap: 8,
+  },
+  modalInput: {
+    flex: 1,
+    fontSize: 14,
+    color: TEXT_DARK,
+  },
+  modalSubmitButton: {
+    backgroundColor: PINK,
+    borderRadius: 26,
+    paddingVertical: 15,
+    alignItems: "center",
+    marginTop: 18,
+  },
+  modalSubmitButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

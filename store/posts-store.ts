@@ -26,6 +26,7 @@ export type Post = {
   colorDescription: string;
   description: string;
   location: string;
+  claimLocation: string | null;
   photos: string[];
   createdAt: number;
   likes: number;
@@ -149,6 +150,7 @@ export async function loadPosts() {
     colorDescription: p.color_description,
     description: p.description,
     location: p.location,
+    claimLocation: p.claim_location ?? null,
     photos: p.photo_urls ?? [],
     createdAt: new Date(p.created_at).getTime(),
     likes: p.likes_count ?? 0,
@@ -224,6 +226,7 @@ export async function addPost(params: {
   colorDescription: string;
   description: string;
   location: string;
+  claimLocation?: string;
   photos: string[]; // local file:// URIs from ImagePicker
 }): Promise<Post> {
   const {
@@ -248,6 +251,7 @@ export async function addPost(params: {
       color_description: params.colorDescription.trim(),
       description: params.description.trim(),
       location: params.location.trim(),
+      claim_location: params.claimLocation?.trim() || null,
       photo_urls: photoUrls,
     })
     .select("*, profiles ( name, avatar_url )")
@@ -268,6 +272,7 @@ export async function addPost(params: {
     colorDescription: data.color_description,
     description: data.description,
     location: data.location,
+    claimLocation: data.claim_location ?? null,
     photos: data.photo_urls ?? [],
     createdAt: new Date(data.created_at).getTime(),
     likes: data.likes_count ?? 0,
