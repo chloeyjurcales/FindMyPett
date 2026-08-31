@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useUnreadNotificationCount } from "../../store/notifications-store";
 
 const PINK = "#EE5C93";
 const ACTIVE = "#EE5C93";
@@ -23,6 +24,7 @@ function ReportTabButton(props: any) {
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const unreadCount = useUnreadNotificationCount();
 
   // Base tap-target height for the bar itself, on top of whatever extra
   // space the phone's own system nav area (gesture bar / home indicator)
@@ -44,6 +46,7 @@ export default function TabsLayout() {
           },
         ],
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarBadgeStyle: styles.tabBarBadge,
       }}
     >
       <Tabs.Screen
@@ -80,6 +83,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="notifications" size={size} color={color} />
           ),
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
         }}
       />
       <Tabs.Screen
@@ -104,6 +108,16 @@ const styles = StyleSheet.create({
   tabBarLabel: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  tabBarBadge: {
+    backgroundColor: PINK,
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    lineHeight: 16,
   },
   reportButtonWrapper: {
     top: -22,

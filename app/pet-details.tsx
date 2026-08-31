@@ -42,6 +42,9 @@ export default function PetDetailsScreen() {
   const [isSendingComment, setIsSendingComment] = useState(false);
   const [isReportingSighting, setIsReportingSighting] = useState(false);
 
+  const goToUserProfile = (userId: string) =>
+    router.push({ pathname: "/user-profile", params: { userId } });
+
   if (!post) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
@@ -187,6 +190,27 @@ export default function PetDetailsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Author row — tap to view who posted this report */}
+          <TouchableOpacity
+            style={styles.authorRow}
+            activeOpacity={0.8}
+            onPress={() => goToUserProfile(post.authorId)}
+          >
+            {post.authorAvatarUrl ? (
+              <Image
+                source={{ uri: post.authorAvatarUrl }}
+                style={styles.authorAvatarImage}
+              />
+            ) : (
+              <View style={styles.authorAvatarCircle}>
+                <Text style={styles.authorAvatarText}>
+                  {(post.authorName || "?").charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.authorNameText}>{post.authorName}</Text>
+          </TouchableOpacity>
+
           {/* Photo */}
           <View style={styles.imageWrapper}>
             {post.photos.length > 0 ? (
@@ -263,23 +287,33 @@ export default function PetDetailsScreen() {
                 const isOwnComment = !!user.id && comment.authorId === user.id;
                 return (
                   <View key={comment.id} style={styles.commentRow}>
-                    {comment.authorAvatarUrl ? (
-                      <Image
-                        source={{ uri: comment.authorAvatarUrl }}
-                        style={styles.commentAvatarImage}
-                      />
-                    ) : (
-                      <View style={styles.commentAvatar}>
-                        <Text style={styles.commentAvatarText}>
-                          {comment.authorName.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
+                    <TouchableOpacity
+                      activeOpacity={0.75}
+                      onPress={() => goToUserProfile(comment.authorId)}
+                    >
+                      {comment.authorAvatarUrl ? (
+                        <Image
+                          source={{ uri: comment.authorAvatarUrl }}
+                          style={styles.commentAvatarImage}
+                        />
+                      ) : (
+                        <View style={styles.commentAvatar}>
+                          <Text style={styles.commentAvatarText}>
+                            {comment.authorName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
                     <View style={styles.commentBubble}>
                       <View style={styles.commentHeaderRow}>
-                        <Text style={styles.commentAuthor}>
-                          {comment.authorName}
-                        </Text>
+                        <TouchableOpacity
+                          activeOpacity={0.75}
+                          onPress={() => goToUserProfile(comment.authorId)}
+                        >
+                          <Text style={styles.commentAuthor}>
+                            {comment.authorName}
+                          </Text>
+                        </TouchableOpacity>
                         <View style={styles.commentHeaderRight}>
                           <Text style={styles.commentTime}>
                             {getRelativeTime(comment.createdAt)}
@@ -366,9 +400,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  authorAvatarImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+  },
+  authorAvatarCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: PINK,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  authorAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  authorNameText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: TEXT_DARK,
+  },
   imageWrapper: {
     position: "relative",
-    marginTop: 4,
+    marginTop: 8,
   },
   image: {
     width: "100%",

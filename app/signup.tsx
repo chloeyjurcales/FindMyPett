@@ -214,30 +214,6 @@ export default function SignUpScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Sign Up with Google */}
-            <TouchableOpacity
-              style={styles.googleButton}
-              activeOpacity={0.85}
-              onPress={() => {
-                // TODO: wire this up to your Google auth flow
-              }}
-            >
-              <Ionicons
-                name="logo-google"
-                size={18}
-                color="#EA4335"
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.googleButtonText}>Sign Up with Google</Text>
-            </TouchableOpacity>
-
             {/* Already have an account */}
             <View style={styles.loginRow}>
               <Text style={styles.loginPromptText}>
@@ -337,40 +313,10 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 22,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: BORDER_GRAY,
-  },
-  dividerText: {
-    marginHorizontal: 12,
-    color: PLACEHOLDER_GRAY,
-    fontSize: 13,
-  },
-  googleButton: {
-    flexDirection: "row",
-    borderWidth: 1.5,
-    borderColor: PINK,
-    borderRadius: 30,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 22,
-  },
-  googleButtonText: {
-    color: "#1A1A1A",
-    fontSize: 15,
-    fontWeight: "600",
-  },
   loginRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginTop: 18,
+    marginTop: 22,
   },
   loginPromptText: {
     color: "#555555",

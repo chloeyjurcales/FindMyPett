@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../lib/supabase";
 import {
   getRelativeTime,
   toggleLike,
@@ -23,26 +25,78 @@ const TEXT_DARK = "#1A1A1A";
 const TEXT_GRAY = "#8A8A8A";
 const BORDER_GRAY = "#EFEFEF";
 const PLACEHOLDER_GRAY = "#A3A3A3";
+const ICON_BG_PINK = "#F9D7E4";
 
 type FilterKey = "All" | "Lost" | "Found" | "Dogs" | "Cats";
+type SearchMode = "Pets" | "People";
 
 const QUICK_FILTERS: FilterKey[] = ["All", "Lost", "Found", "Dogs", "Cats"];
-
-// TODO: replace with the real signed-in user's saved/selected location
-const DEFAULT_LOCATION = "";
 
 // TODO: persist real recent searches per user instead of local screen state
 const INITIAL_RECENT_SEARCHES: string[] = [];
 
+type PersonResult = {
+  id: string;
+  name: string;
+  location: string;
+  avatarUrl: string | null;
+};
+
 export default function SearchScreen() {
   const posts = usePosts();
+  const router = useRouter();
 
+  const [mode, setMode] = useState<SearchMode>("Pets");
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterKey>("All");
-  const [currentLocation, setCurrentLocation] = useState(DEFAULT_LOCATION);
   const [recentSearches, setRecentSearches] = useState<string[]>(
     INITIAL_RECENT_SEARCHES,
   );
+
+  const [peopleResults, setPeopleResults] = useState<PersonResult[]>([]);
+  const [isSearchingPeople, setIsSearchingPeople] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Search `profiles` by name whenever the query changes while in People
+  // mode. Debounced so it doesn't fire on every keystroke.
+  useEffect(() => {
+    if (mode !== "People") return;
+
+    const trimmed = query.trim();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!trimmed) {
+      setPeopleResults([]);
+      setIsSearchingPeople(false);
+      return;
+    }
+
+    setIsSearchingPeople(true);
+    debounceRef.current = setTimeout(async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name, location, avatar_url")
+        .ilike("name", `%${trimmed}%`)
+        .order("name", { ascending: true })
+        .limit(30);
+
+      if (!error) {
+        setPeopleResults(
+          (data ?? []).map((p) => ({
+            id: p.id,
+            name: p.name || "Pet Parent",
+            location: p.location || "",
+            avatarUrl: p.avatar_url || null,
+          })),
+        );
+      }
+      setIsSearchingPeople(false);
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, mode]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -90,151 +144,298 @@ export default function SearchScreen() {
 
   const handleClearRecent = () => setRecentSearches([]);
 
+  const handleModeChange = (newMode: SearchMode) => {
+    setMode(newMode);
+    setQuery("");
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <FlatList
-        data={results}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <>
-            <View style={styles.headerRow}>
-              <Text style={styles.headerTitle}>Search</Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  // TODO: open advanced filters sheet once designed
-                }}
-              >
-                <Ionicons name="options-outline" size={22} color={PINK} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Search bar */}
-            <View style={styles.searchBar}>
-              <Ionicons
-                name="search"
-                size={18}
-                color={PLACEHOLDER_GRAY}
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search pets, breed, or location..."
-                placeholderTextColor={PLACEHOLDER_GRAY}
-                value={query}
-                onChangeText={setQuery}
-                onSubmitEditing={() => commitSearch(query)}
-                returnKeyType="search"
-              />
-              {query.length > 0 && (
-                <TouchableOpacity onPress={() => setQuery("")}>
-                  <Ionicons
-                    name="close-circle"
-                    size={18}
-                    color={PLACEHOLDER_GRAY}
-                  />
+      {mode === "Pets" ? (
+        <FlatList
+          data={results}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <>
+              <View style={styles.headerRow}>
+                <Text style={styles.headerTitle}>Search</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    // TODO: open advanced filters sheet once designed
+                  }}
+                >
+                  <Ionicons name="options-outline" size={22} color={PINK} />
                 </TouchableOpacity>
-              )}
-            </View>
+              </View>
 
-            {/* Quick filters */}
-            <Text style={styles.sectionLabel}>Quick Filters</Text>
-            <View style={styles.filterRow}>
-              {QUICK_FILTERS.map((filter) => {
-                const isActive = activeFilter === filter;
-                const showPaw = filter === "Dogs" || filter === "Cats";
-                return (
-                  <TouchableOpacity
-                    key={filter}
-                    style={[
-                      styles.filterChip,
-                      isActive && styles.filterChipActive,
-                    ]}
-                    activeOpacity={0.8}
-                    onPress={() => setActiveFilter(filter)}
-                  >
-                    {showPaw && (
-                      <Ionicons
-                        name="paw"
-                        size={12}
-                        color={isActive ? "#FFFFFF" : TEXT_DARK}
-                        style={styles.filterChipIcon}
-                      />
-                    )}
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        isActive && styles.filterChipTextActive,
-                      ]}
-                    >
-                      {filter}
-                    </Text>
+              <ModeToggle mode={mode} onChange={handleModeChange} />
+
+              {/* Search bar */}
+              <View style={styles.searchBar}>
+                <Ionicons
+                  name="search"
+                  size={18}
+                  color={PLACEHOLDER_GRAY}
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search pets, breed, or location..."
+                  placeholderTextColor={PLACEHOLDER_GRAY}
+                  value={query}
+                  onChangeText={setQuery}
+                  onSubmitEditing={() => commitSearch(query)}
+                  returnKeyType="search"
+                />
+                {query.length > 0 && (
+                  <TouchableOpacity onPress={() => setQuery("")}>
+                    <Ionicons
+                      name="close-circle"
+                      size={18}
+                      color={PLACEHOLDER_GRAY}
+                    />
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                )}
+              </View>
 
-            {/* Location */}
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={16} color={PINK} />
-              <Text style={styles.locationText}>
-                {currentLocation || "Set your location"}
-              </Text>
-              <TouchableOpacity
-                style={styles.changeButton}
-                onPress={() => {
-                  // TODO: open location picker once available and call
-                  // setCurrentLocation(...) with the user's real selection
-                }}
-              >
-                <Text style={styles.changeText}>Change</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Recent searches */}
-            {recentSearches.length > 0 && (
-              <>
-                <View style={styles.recentHeaderRow}>
-                  <Text style={styles.sectionLabel}>Recent Searches</Text>
-                  <TouchableOpacity onPress={handleClearRecent}>
-                    <Text style={styles.clearAllText}>Clear all</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.recentRow}>
-                  {recentSearches.map((term) => (
+              {/* Quick filters */}
+              <Text style={styles.sectionLabel}>Quick Filters</Text>
+              <View style={styles.filterRow}>
+                {QUICK_FILTERS.map((filter) => {
+                  const isActive = activeFilter === filter;
+                  const showPaw = filter === "Dogs" || filter === "Cats";
+                  return (
                     <TouchableOpacity
-                      key={term}
-                      style={styles.recentChip}
-                      activeOpacity={0.75}
-                      onPress={() => handleRecentPress(term)}
+                      key={filter}
+                      style={[
+                        styles.filterChip,
+                        isActive && styles.filterChipActive,
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => setActiveFilter(filter)}
                     >
-                      <Text style={styles.recentChipText}>{term}</Text>
+                      {showPaw && (
+                        <Ionicons
+                          name="paw"
+                          size={12}
+                          color={isActive ? "#FFFFFF" : TEXT_DARK}
+                          style={styles.filterChipIcon}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          isActive && styles.filterChipTextActive,
+                        ]}
+                      >
+                        {filter}
+                      </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
+                  );
+                })}
+              </View>
 
-            <Text style={[styles.sectionLabel, styles.resultsLabel]}>
-              Search Results
-            </Text>
-          </>
-        }
-        renderItem={({ item }) => <SearchResultRow post={item} />}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="search-outline" size={36} color="#C9C9C9" />
-            <Text style={styles.emptyTitle}>No pets found</Text>
-            <Text style={styles.emptySubtitle}>
-              Try a different search term or filter.
-            </Text>
-          </View>
-        }
-      />
+              {/* Recent searches */}
+              {recentSearches.length > 0 && (
+                <>
+                  <View style={styles.recentHeaderRow}>
+                    <Text style={styles.sectionLabel}>Recent Searches</Text>
+                    <TouchableOpacity onPress={handleClearRecent}>
+                      <Text style={styles.clearAllText}>Clear all</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.recentRow}>
+                    {recentSearches.map((term) => (
+                      <TouchableOpacity
+                        key={term}
+                        style={styles.recentChip}
+                        activeOpacity={0.75}
+                        onPress={() => handleRecentPress(term)}
+                      >
+                        <Text style={styles.recentChipText}>{term}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              <Text style={[styles.sectionLabel, styles.resultsLabel]}>
+                Search Results
+              </Text>
+            </>
+          }
+          renderItem={({ item }) => <SearchResultRow post={item} />}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="search-outline" size={36} color="#C9C9C9" />
+              <Text style={styles.emptyTitle}>No pets found</Text>
+              <Text style={styles.emptySubtitle}>
+                Try a different search term or filter.
+              </Text>
+            </View>
+          }
+        />
+      ) : (
+        <FlatList
+          data={peopleResults}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <>
+              <View style={styles.headerRow}>
+                <Text style={styles.headerTitle}>Search</Text>
+              </View>
+
+              <ModeToggle mode={mode} onChange={handleModeChange} />
+
+              <View style={styles.searchBar}>
+                <Ionicons
+                  name="search"
+                  size={18}
+                  color={PLACEHOLDER_GRAY}
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search people by name..."
+                  placeholderTextColor={PLACEHOLDER_GRAY}
+                  value={query}
+                  onChangeText={setQuery}
+                  returnKeyType="search"
+                  autoFocus
+                />
+                {query.length > 0 && (
+                  <TouchableOpacity onPress={() => setQuery("")}>
+                    <Ionicons
+                      name="close-circle"
+                      size={18}
+                      color={PLACEHOLDER_GRAY}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {isSearchingPeople && (
+                <View style={styles.peopleLoadingRow}>
+                  <ActivityIndicator color={PINK} size="small" />
+                </View>
+              )}
+            </>
+          }
+          renderItem={({ item }) => (
+            <PersonResultRow person={item} router={router} />
+          )}
+          ListEmptyComponent={
+            query.trim().length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={36} color="#C9C9C9" />
+                <Text style={styles.emptyTitle}>Find people</Text>
+                <Text style={styles.emptySubtitle}>
+                  Search by name to find other users.
+                </Text>
+              </View>
+            ) : !isSearchingPeople ? (
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name="person-remove-outline"
+                  size={36}
+                  color="#C9C9C9"
+                />
+                <Text style={styles.emptyTitle}>No people found</Text>
+                <Text style={styles.emptySubtitle}>Try a different name.</Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
     </SafeAreaView>
+  );
+}
+
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: SearchMode;
+  onChange: (mode: SearchMode) => void;
+}) {
+  return (
+    <View style={styles.modeToggleRow}>
+      {(["Pets", "People"] as SearchMode[]).map((option) => {
+        const isActive = mode === option;
+        return (
+          <TouchableOpacity
+            key={option}
+            style={[
+              styles.modeToggleChip,
+              isActive && styles.modeToggleChipActive,
+            ]}
+            activeOpacity={0.85}
+            onPress={() => onChange(option)}
+          >
+            <Text
+              style={[
+                styles.modeToggleText,
+                isActive && styles.modeToggleTextActive,
+              ]}
+            >
+              {option}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function PersonResultRow({
+  person,
+  router,
+}: {
+  person: PersonResult;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const initial = (person.name || "?").charAt(0).toUpperCase();
+
+  return (
+    <TouchableOpacity
+      style={styles.personRow}
+      activeOpacity={0.8}
+      onPress={() =>
+        router.push({
+          pathname: "/user-profile",
+          params: { userId: person.id },
+        })
+      }
+    >
+      {person.avatarUrl ? (
+        <Image
+          source={{ uri: person.avatarUrl }}
+          style={styles.personAvatarImage}
+        />
+      ) : (
+        <View style={styles.personAvatarCircle}>
+          <Text style={styles.personAvatarText}>{initial}</Text>
+        </View>
+      )}
+      <View style={styles.personTextArea}>
+        <Text style={styles.personName} numberOfLines={1}>
+          {person.name}
+        </Text>
+        {!!person.location && (
+          <Text style={styles.personLocation} numberOfLines={1}>
+            {person.location}
+          </Text>
+        )}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#C9C9C9" />
+    </TouchableOpacity>
   );
 }
 
@@ -335,6 +536,36 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: TEXT_DARK,
   },
+  modeToggleRow: {
+    flexDirection: "row",
+    backgroundColor: "#F2F2F2",
+    borderRadius: 24,
+    padding: 4,
+    marginBottom: 16,
+  },
+  modeToggleChip: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modeToggleChipActive: {
+    backgroundColor: PINK,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modeToggleText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#8A8A8A",
+  },
+  modeToggleTextActive: {
+    color: "#FFFFFF",
+  },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -388,30 +619,6 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: "#FFFFFF",
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FBEEF3",
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 20,
-    gap: 6,
-  },
-  locationText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    color: TEXT_DARK,
-  },
-  changeButton: {
-    paddingLeft: 8,
-  },
-  changeText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: PINK,
   },
   recentHeaderRow: {
     flexDirection: "row",
@@ -526,6 +733,53 @@ const styles = StyleSheet.create({
   resultTime: {
     fontSize: 11,
     color: TEXT_GRAY,
+  },
+  peopleLoadingRow: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  personRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: BORDER_GRAY,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  personAvatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+  },
+  personAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: ICON_BG_PINK,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  personAvatarText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: PINK,
+  },
+  personTextArea: {
+    flex: 1,
+  },
+  personName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEXT_DARK,
+  },
+  personLocation: {
+    fontSize: 12,
+    color: TEXT_GRAY,
+    marginTop: 2,
   },
   emptyState: {
     alignItems: "center",

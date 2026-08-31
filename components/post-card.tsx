@@ -32,6 +32,12 @@ export function PostCard({ post }: { post: Post }) {
   const goToDetails = () =>
     router.push({ pathname: "/pet-details", params: { id: post.id } });
 
+  const goToAuthorProfile = () =>
+    router.push({
+      pathname: "/user-profile",
+      params: { userId: post.authorId },
+    });
+
   const handleDeletePost = () => {
     Alert.alert(
       "Delete this report?",
@@ -58,10 +64,10 @@ export function PostCard({ post }: { post: Post }) {
 
   return (
     <View style={styles.card}>
-      {/* Author header (avatar + name) — same fields already shown on comments */}
+      {/* Author header (avatar + name) — tapping it opens THAT user's profile */}
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={goToDetails}
+        onPress={goToAuthorProfile}
         style={styles.authorRow}
       >
         {post.authorAvatarUrl ? (

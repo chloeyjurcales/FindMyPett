@@ -2,16 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../lib/supabase";
 
 const PINK = "#EE5C93";
 const LIGHT_PINK = "#F6BFD6";
@@ -19,17 +21,139 @@ const BUILDING_PINK = "#F3A9C6";
 const BORDER_GRAY = "#E3E3E3";
 const PLACEHOLDER_GRAY = "#A3A3A3";
 
+type Step = "email" | "code" | "newPassword" | "done";
+
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
 
-  const handleReset = () => {
-    // TODO: replace with real Supabase "reset password" call once your
-    // auth setup is ready. For now this just flips the confirmation state.
-    if (!email.trim()) return;
-    setSubmitted(true);
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Step 1: send a 6-digit reset code to the user's email. Doesn't require
+  // any deep link / redirect URL setup — the code is typed in manually.
+  const handleSendCode = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      Alert.alert("Missing email", "Please enter your email address.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail);
+    setIsSubmitting(false);
+
+    if (error) {
+      Alert.alert("Couldn't send code", error.message);
+      return;
+    }
+
+    setStep("code");
   };
+
+  // Step 2: verify the 6-digit code the user got by email. On success this
+  // establishes a temporary "recovery" session, which is required before
+  // updateUser() (the actual password change) is allowed.
+  const handleVerifyCode = async () => {
+    const trimmedCode = code.trim();
+    if (!trimmedCode) {
+      Alert.alert("Missing code", "Please enter the code we emailed you.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: trimmedCode,
+      type: "recovery",
+    });
+    setIsSubmitting(false);
+
+    if (error) {
+      Alert.alert(
+        "Invalid or expired code",
+        "Please check the code and try again, or request a new one.",
+      );
+      return;
+    }
+
+    setStep("newPassword");
+  };
+
+  // Step 3: with the recovery session active, actually change the password.
+  const handleSetNewPassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      Alert.alert("Missing info", "Please fill in both password fields.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert("Password too short", "Use at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Passwords don't match", "Please re-enter your password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    setIsSubmitting(false);
+
+    if (error) {
+      Alert.alert("Couldn't update password", error.message);
+      return;
+    }
+
+    // This also signs the user in (the recovery session becomes their
+    // normal session), so send them straight into the app.
+    setStep("done");
+  };
+
+  const handleResendCode = async () => {
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    setIsSubmitting(false);
+
+    if (error) {
+      Alert.alert("Couldn't resend code", error.message);
+      return;
+    }
+    Alert.alert("Code sent", "Check your email for a new code.");
+  };
+
+  const iconName =
+    step === "done"
+      ? "checkmark-circle-outline"
+      : step === "code"
+        ? "keypad-outline"
+        : step === "newPassword"
+          ? "lock-closed-outline"
+          : "mail-outline";
+
+  const title =
+    step === "email"
+      ? "Forgot Password?"
+      : step === "code"
+        ? "Enter Code"
+        : step === "newPassword"
+          ? "Set New Password"
+          : "Password Updated";
+
+  const subtitle =
+    step === "email"
+      ? "No worries! Enter your email and we'll\nsend you a reset code."
+      : step === "code"
+        ? `We've sent a 6-digit code to\n${email}`
+        : step === "newPassword"
+          ? "Choose a new password for your account."
+          : "You're all set! You can now use your\nnew password to log in.";
 
   return (
     <View style={styles.container}>
@@ -52,28 +176,15 @@ export default function ForgotPasswordScreen() {
 
             {/* Icon */}
             <View style={styles.iconCircle}>
-              <Ionicons
-                name={
-                  submitted ? "checkmark-circle-outline" : "lock-closed-outline"
-                }
-                size={32}
-                color={PINK}
-              />
+              <Ionicons name={iconName} size={32} color={PINK} />
             </View>
 
             {/* Title */}
-            <Text style={styles.title}>
-              {submitted ? "Check Your Email" : "Forgot Password?"}
-            </Text>
-            <Text style={styles.subtitle}>
-              {submitted
-                ? `We've sent password reset instructions to\n${email}`
-                : "No worries! Enter your email and we'll\nsend you reset instructions."}
-            </Text>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
 
-            {!submitted ? (
+            {step === "email" && (
               <>
-                {/* Email input */}
                 <View style={styles.inputWrapper}>
                   <Ionicons
                     name="mail-outline"
@@ -92,49 +203,159 @@ export default function ForgotPasswordScreen() {
                   />
                 </View>
 
-                {/* Send reset link button */}
                 <TouchableOpacity
-                  style={styles.primaryButton}
+                  style={[
+                    styles.primaryButton,
+                    isSubmitting && styles.buttonDisabled,
+                  ]}
                   activeOpacity={0.85}
-                  onPress={handleReset}
+                  onPress={handleSendCode}
+                  disabled={isSubmitting}
                 >
-                  <Text style={styles.primaryButtonText}>Send Reset Link</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                {/* Resend link */}
-                <TouchableOpacity
-                  style={styles.resendWrapper}
-                  onPress={handleReset}
-                >
-                  <Text style={styles.resendText}>
-                    Didn&apos;t get the email?{" "}
-                    <Text style={styles.resendTextBold}>Resend</Text>
+                  <Text style={styles.primaryButtonText}>
+                    {isSubmitting ? "Sending..." : "Send Reset Code"}
                   </Text>
-                </TouchableOpacity>
-
-                {/* Back to login button */}
-                <TouchableOpacity
-                  style={styles.primaryButton}
-                  activeOpacity={0.85}
-                  onPress={() => router.replace("/login")}
-                >
-                  <Text style={styles.primaryButtonText}>Back to Log In</Text>
                 </TouchableOpacity>
               </>
             )}
 
-            {!submitted && (
+            {step === "code" && (
               <>
-                {/* Divider */}
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="keypad-outline"
+                    size={20}
+                    color={PLACEHOLDER_GRAY}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="6-digit code"
+                    placeholderTextColor={PLACEHOLDER_GRAY}
+                    value={code}
+                    onChangeText={setCode}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.primaryButton,
+                    isSubmitting && styles.buttonDisabled,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={handleVerifyCode}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {isSubmitting ? "Verifying..." : "Verify Code"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.resendWrapper}
+                  onPress={handleResendCode}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.resendText}>
+                    Didn&apos;t get the code?{" "}
+                    <Text style={styles.resendTextBold}>Resend</Text>
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {step === "newPassword" && (
+              <>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={PLACEHOLDER_GRAY}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="New password"
+                    placeholderTextColor={PLACEHOLDER_GRAY}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((prev) => !prev)}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-outline" : "eye-off-outline"}
+                      size={20}
+                      color={PLACEHOLDER_GRAY}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={PLACEHOLDER_GRAY}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm new password"
+                    placeholderTextColor={PLACEHOLDER_GRAY}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showConfirmPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword((prev) => !prev)}
+                  >
+                    <Ionicons
+                      name={
+                        showConfirmPassword ? "eye-outline" : "eye-off-outline"
+                      }
+                      size={20}
+                      color={PLACEHOLDER_GRAY}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.primaryButton,
+                    isSubmitting && styles.buttonDisabled,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={handleSetNewPassword}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {isSubmitting ? "Updating..." : "Update Password"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {step === "done" && (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                activeOpacity={0.85}
+                onPress={() => router.replace("/(tabs)")}
+              >
+                <Text style={styles.primaryButtonText}>Continue</Text>
+              </TouchableOpacity>
+            )}
+
+            {step === "email" && (
+              <>
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
                   <Text style={styles.dividerText}>or</Text>
                   <View style={styles.dividerLine} />
                 </View>
 
-                {/* Back to login */}
                 <TouchableOpacity
                   style={styles.createAccountButton}
                   activeOpacity={0.85}
@@ -240,6 +461,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   resendWrapper: {
     alignSelf: "center",
