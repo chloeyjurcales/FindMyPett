@@ -47,11 +47,9 @@ export default function HomeScreen() {
         onClose={() => setIsMenuVisible(false)}
       />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Lost a pet banner */}
+      {/* Lost a pet banner — fixed, stays visible while the posts list
+          below scrolls underneath it */}
+      <View style={styles.bannerWrapper}>
         <View style={styles.banner}>
           <View style={styles.bannerTextArea}>
             <Text style={styles.bannerTitle}>Lost a pet?</Text>
@@ -78,15 +76,21 @@ export default function HomeScreen() {
             <Ionicons name="paw" size={64} color="rgba(0,0,0,0.12)" />
           </View>
         </View>
+      </View>
 
-        {/* Recent Posts section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Posts</Text>
-          <TouchableOpacity onPress={() => router.push("/all-posts")}>
-            <Text style={styles.seeAllText}>See All</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Recent Posts section header — fixed, stays visible below the
+          banner while the posts list scrolls underneath it */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Recent Posts</Text>
+        <TouchableOpacity onPress={() => router.push("/all-posts")}>
+          <Text style={styles.seeAllText}>See All</Text>
+        </TouchableOpacity>
+      </View>
 
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {posts.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="paw-outline" size={40} color="#C9C9C9" />
@@ -199,12 +203,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 30,
   },
+  bannerWrapper: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: "#FFFFFF",
+  },
   banner: {
     flexDirection: "row",
     backgroundColor: LIGHT_PINK,
     borderRadius: 22,
     padding: 20,
-    marginTop: 8,
     overflow: "hidden",
   },
   bannerTextArea: {
@@ -248,8 +256,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 26,
-    marginBottom: 14,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F2F2F2",
+    zIndex: 10,
   },
   sectionTitle: {
     fontSize: 17,
