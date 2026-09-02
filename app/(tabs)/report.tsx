@@ -165,7 +165,7 @@ export default function ReportScreen() {
     <View style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <SafeAreaView style={styles.safeArea} edges={["top"]}>
           {/* Header */}
@@ -685,7 +685,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: "#1A1A1A",
-    marginBottom: 8,
   },
   modalOption: {
     paddingVertical: 14,

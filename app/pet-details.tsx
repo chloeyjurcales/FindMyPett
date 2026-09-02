@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Dimensions,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -23,9 +24,11 @@ import {
 import { notifyPostOwner } from "../store/notifications-store";
 import {
   addComment,
+  Comment,
   deleteComment,
   deletePost,
   getRelativeTime,
+  toggleCommentLike,
   usePostById,
 } from "../store/posts-store";
 import { useUserProfile } from "../store/user-store";
@@ -48,6 +51,49 @@ export default function PetDetailsScreen() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [seenModalVisible, setSeenModalVisible] = useState(false);
   const [sightingLocation, setSightingLocation] = useState("");
+  const [replyingTo, setReplyingTo] = useState<{
+    commentId: string;
+    authorName: string;
+  } | null>(null);
+  const commentInputRef = useRef<TextInput>(null);
+
+  // Tracks the keyboard's current height so we can lift the comment box
+  // (and the sighting modal) above it ourselves. We don't use
+  // KeyboardAvoidingView's built-in "height"/"padding" behaviors here:
+  // on this project's Android setup they weren't reliably resetting to 0
+  // once the keyboard closed, leaving the input stuck in the raised
+  // position. Driving a single Animated.Value from the keyboard show/hide
+  // events ourselves is fully deterministic — it always animates back to
+  // exactly 0 on hide, with nothing else able to leave it out of sync.
+  const keyboardHeight = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e: any) => {
+      Animated.timing(keyboardHeight, {
+        toValue: e?.endCoordinates?.height ?? 0,
+        duration: Platform.OS === "ios" ? (e?.duration ?? 250) : 200,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, (e: any) => {
+      Animated.timing(keyboardHeight, {
+        toValue: 0,
+        duration: Platform.OS === "ios" ? (e?.duration ?? 250) : 200,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [keyboardHeight]);
 
   const goToUserProfile = (userId: string) =>
     router.push({ pathname: "/user-profile", params: { userId } });
@@ -85,8 +131,13 @@ export default function PetDetailsScreen() {
     if (!commentText.trim()) return;
     setIsSendingComment(true);
     try {
-      await addComment(post.id, commentText);
+      await addComment(post.id, commentText, replyingTo?.commentId ?? null);
       setCommentText("");
+      setReplyingTo(null);
+      // Drop focus and close the keyboard after a successful send so the
+      // input bar doesn't stay pinned up against an open keyboard.
+      commentInputRef.current?.blur();
+      Keyboard.dismiss();
     } catch (error: any) {
       Alert.alert(
         "Couldn't post comment",
@@ -95,6 +146,17 @@ export default function PetDetailsScreen() {
     } finally {
       setIsSendingComment(false);
     }
+  };
+
+  const handleStartReply = (comment: Comment) => {
+    setReplyingTo({
+      commentId: comment.parentCommentId ?? comment.id,
+      authorName: comment.authorName,
+    });
+  };
+
+  const handleToggleCommentLike = (commentId: string) => {
+    toggleCommentLike(post.id, commentId);
   };
 
   const handleDeletePost = () => {
@@ -142,10 +204,6 @@ export default function PetDetailsScreen() {
     ]);
   };
 
-  // Notifies the post owner that someone may have seen their pet, including
-  // the location the person entered for where they saw it. This is a no-op
-  // (silently skipped, not shown as an error) when you view your own post —
-  // you can't "see" your own missing pet.
   const handleSeenPet = async () => {
     const trimmedLocation = sightingLocation.trim();
     if (!trimmedLocation) {
@@ -174,6 +232,93 @@ export default function PetDetailsScreen() {
     }
   };
 
+  const renderComment = (comment: Comment, isReply: boolean) => {
+    const isOwnComment = !!user.id && comment.authorId === user.id;
+    return (
+      <View
+        key={comment.id}
+        style={[styles.commentRow, isReply && styles.replyRow]}
+      >
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => goToUserProfile(comment.authorId)}
+        >
+          {comment.authorAvatarUrl ? (
+            <Image
+              source={{ uri: comment.authorAvatarUrl }}
+              style={
+                isReply ? styles.replyAvatarImage : styles.commentAvatarImage
+              }
+            />
+          ) : (
+            <View style={isReply ? styles.replyAvatar : styles.commentAvatar}>
+              <Text style={styles.commentAvatarText}>
+                {comment.authorName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <View style={styles.commentBubble}>
+          <View style={styles.commentHeaderRow}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => goToUserProfile(comment.authorId)}
+            >
+              <Text style={styles.commentAuthor}>{comment.authorName}</Text>
+            </TouchableOpacity>
+            <View style={styles.commentHeaderRight}>
+              <Text style={styles.commentTime}>
+                {getRelativeTime(comment.createdAt)}
+              </Text>
+              {isOwnComment && (
+                <TouchableOpacity
+                  onPress={() => handleDeleteComment(comment.id)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="trash-outline" size={14} color="#A3A3A3" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+          <Text style={styles.commentText}>{comment.text}</Text>
+
+          {/* Like / Reply actions */}
+          <View style={styles.commentActionsRow}>
+            <TouchableOpacity
+              style={styles.commentActionButton}
+              activeOpacity={0.7}
+              onPress={() => handleToggleCommentLike(comment.id)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons
+                name={comment.liked ? "heart" : "heart-outline"}
+                size={14}
+                color={comment.liked ? PINK : "#8A8A8A"}
+              />
+              <Text
+                style={[
+                  styles.commentActionText,
+                  comment.liked && styles.commentActionTextActive,
+                ]}
+              >
+                Like{comment.likes > 0 ? ` (${comment.likes})` : ""}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.commentActionButton}
+              activeOpacity={0.7}
+              onPress={() => handleStartReply(comment)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text style={styles.commentActionText}>Reply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
@@ -197,17 +342,13 @@ export default function PetDetailsScreen() {
         )}
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
+      <Animated.View style={{ flex: 1, paddingBottom: keyboardHeight }}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Author row — tap to view who posted this report */}
+          {/* Author row */}
           <TouchableOpacity
             style={styles.authorRow}
             activeOpacity={0.8}
@@ -356,63 +497,37 @@ export default function PetDetailsScreen() {
             </Text>
           ) : (
             <View style={styles.commentsList}>
-              {post.comments.map((comment) => {
-                const isOwnComment = !!user.id && comment.authorId === user.id;
-                return (
-                  <View key={comment.id} style={styles.commentRow}>
-                    <TouchableOpacity
-                      activeOpacity={0.75}
-                      onPress={() => goToUserProfile(comment.authorId)}
-                    >
-                      {comment.authorAvatarUrl ? (
-                        <Image
-                          source={{ uri: comment.authorAvatarUrl }}
-                          style={styles.commentAvatarImage}
-                        />
-                      ) : (
-                        <View style={styles.commentAvatar}>
-                          <Text style={styles.commentAvatarText}>
-                            {comment.authorName.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                    <View style={styles.commentBubble}>
-                      <View style={styles.commentHeaderRow}>
-                        <TouchableOpacity
-                          activeOpacity={0.75}
-                          onPress={() => goToUserProfile(comment.authorId)}
-                        >
-                          <Text style={styles.commentAuthor}>
-                            {comment.authorName}
-                          </Text>
-                        </TouchableOpacity>
-                        <View style={styles.commentHeaderRight}>
-                          <Text style={styles.commentTime}>
-                            {getRelativeTime(comment.createdAt)}
-                          </Text>
-                          {isOwnComment && (
-                            <TouchableOpacity
-                              onPress={() => handleDeleteComment(comment.id)}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            >
-                              <Ionicons
-                                name="trash-outline"
-                                size={14}
-                                color="#A3A3A3"
-                              />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      </View>
-                      <Text style={styles.commentText}>{comment.text}</Text>
-                    </View>
+              {post.comments
+                .filter((comment) => !comment.parentCommentId)
+                .map((comment) => (
+                  <View key={comment.id}>
+                    {renderComment(comment, false)}
+                    {post.comments
+                      .filter((reply) => reply.parentCommentId === comment.id)
+                      .map((reply) => renderComment(reply, true))}
                   </View>
-                );
-              })}
+                ))}
             </View>
           )}
         </ScrollView>
+
+        {/* Replying banner */}
+        {replyingTo && (
+          <View style={styles.replyingBanner}>
+            <Text style={styles.replyingBannerText}>
+              Replying to{" "}
+              <Text style={styles.replyingBannerName}>
+                {replyingTo.authorName}
+              </Text>
+            </Text>
+            <TouchableOpacity
+              onPress={() => setReplyingTo(null)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={16} color="#8A8A8A" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Comment input */}
         <View
@@ -422,8 +537,13 @@ export default function PetDetailsScreen() {
           ]}
         >
           <TextInput
+            ref={commentInputRef}
             style={styles.commentInput}
-            placeholder="Write a comment..."
+            placeholder={
+              replyingTo
+                ? `Reply to ${replyingTo.authorName}...`
+                : "Write a comment..."
+            }
             placeholderTextColor="#A3A3A3"
             value={commentText}
             onChangeText={setCommentText}
@@ -442,24 +562,21 @@ export default function PetDetailsScreen() {
             <Ionicons name="send" size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
 
-      {/* "I have Seen This Pet" — asks where the pet was seen before notifying the owner */}
+      {/* Sighting Modal */}
       <Modal
         visible={seenModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setSeenModalVisible(false)}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSeenModalVisible(false)}
         >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setSeenModalVisible(false)}
-          >
+          <Animated.View style={{ marginBottom: keyboardHeight }}>
             <TouchableOpacity
               activeOpacity={1}
               style={styles.modalSheet}
@@ -496,8 +613,8 @@ export default function PetDetailsScreen() {
                 </Text>
               </TouchableOpacity>
             </TouchableOpacity>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+          </Animated.View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -697,6 +814,42 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
+  replyRow: {
+    marginTop: 10,
+    marginLeft: 30,
+  },
+  replyAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: PINK,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  replyAvatarImage: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
+  commentActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginTop: 8,
+  },
+  commentActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  commentActionText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#8A8A8A",
+  },
+  commentActionTextActive: {
+    color: PINK,
+  },
   commentAvatar: {
     width: 32,
     height: 32,
@@ -746,6 +899,24 @@ const styles = StyleSheet.create({
     color: TEXT_GRAY,
     marginTop: 3,
     lineHeight: 18,
+  },
+  replyingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: "#FBEFF3",
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  replyingBannerText: {
+    fontSize: 12,
+    color: TEXT_GRAY,
+  },
+  replyingBannerName: {
+    fontWeight: "700",
+    color: TEXT_DARK,
   },
   commentInputRow: {
     flexDirection: "row",

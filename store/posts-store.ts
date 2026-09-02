@@ -11,6 +11,9 @@ export type Comment = {
   authorAvatarUrl: string | null;
   text: string;
   createdAt: number;
+  parentCommentId: string | null;
+  likes: number;
+  liked: boolean;
 };
 
 export type Post = {
@@ -89,11 +92,12 @@ export async function loadPosts() {
   const postIds = rows.map((p) => p.id);
 
   const commentsByPost: Record<string, Comment[]> = {};
+  const commentIds: string[] = [];
   if (postIds.length > 0) {
     const { data: commentsData, error: commentsError } = await supabase
       .from("post_comments")
       .select(
-        "id, post_id, author_id, text, created_at, profiles ( name, avatar_url )",
+        "id, post_id, author_id, text, created_at, parent_comment_id, likes_count, profiles ( name, avatar_url )",
       )
       .in("post_id", postIds)
       .order("created_at", { ascending: true });
@@ -109,16 +113,21 @@ export async function loadPosts() {
           authorAvatarUrl: (c as any).profiles?.avatar_url || null,
           text: c.text,
           createdAt: new Date(c.created_at).getTime(),
+          parentCommentId: (c as any).parent_comment_id ?? null,
+          likes: (c as any).likes_count ?? 0,
+          liked: false,
         };
         commentsByPost[c.post_id] = [
           ...(commentsByPost[c.post_id] ?? []),
           comment,
         ];
+        commentIds.push(c.id);
       }
     }
   }
 
   let likedPostIds = new Set<string>();
+  let likedCommentIds = new Set<string>();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -134,6 +143,31 @@ export async function loadPosts() {
       console.warn("Failed to load likes:", likesError.message);
     } else {
       likedPostIds = new Set((likesData ?? []).map((l) => l.post_id));
+    }
+  }
+
+  if (user && commentIds.length > 0) {
+    const { data: commentLikesData, error: commentLikesError } = await supabase
+      .from("comment_likes")
+      .select("comment_id")
+      .eq("user_id", user.id)
+      .in("comment_id", commentIds);
+
+    if (commentLikesError) {
+      console.warn("Failed to load comment likes:", commentLikesError.message);
+    } else {
+      likedCommentIds = new Set(
+        (commentLikesData ?? []).map((l) => l.comment_id),
+      );
+    }
+  }
+
+  if (likedCommentIds.size > 0) {
+    for (const postId of Object.keys(commentsByPost)) {
+      commentsByPost[postId] = commentsByPost[postId].map((c) => ({
+        ...c,
+        liked: likedCommentIds.has(c.id),
+      }));
     }
   }
 
@@ -187,6 +221,11 @@ supabase
   .on(
     "postgres_changes",
     { event: "*", schema: "public", table: "post_likes" },
+    () => loadPosts(),
+  )
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "comment_likes" },
     () => loadPosts(),
   )
   .subscribe();
@@ -368,6 +407,7 @@ export async function toggleLike(postId: string) {
 export async function addComment(
   postId: string,
   text: string,
+  parentCommentId?: string | null,
 ): Promise<Comment | undefined> {
   const trimmed = text.trim();
   if (!trimmed) return undefined;
@@ -377,14 +417,23 @@ export async function addComment(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("You need to be signed in to comment.");
 
-  // Grab the post's owner BEFORE the insert so we know who to notify.
+  // Grab the post's owner + (if this is a reply) the parent comment's
+  // author BEFORE the insert so we know who to notify.
   const targetPost = posts.find((p) => p.id === postId);
+  const parentComment = parentCommentId
+    ? targetPost?.comments.find((c) => c.id === parentCommentId)
+    : undefined;
 
   const { data, error } = await supabase
     .from("post_comments")
-    .insert({ post_id: postId, author_id: user.id, text: trimmed })
+    .insert({
+      post_id: postId,
+      author_id: user.id,
+      text: trimmed,
+      parent_comment_id: parentCommentId ?? null,
+    })
     .select(
-      "id, post_id, author_id, text, created_at, profiles ( name, avatar_url )",
+      "id, post_id, author_id, text, created_at, parent_comment_id, likes_count, profiles ( name, avatar_url )",
     )
     .single();
 
@@ -400,6 +449,9 @@ export async function addComment(
     authorAvatarUrl,
     text: data.text,
     createdAt: new Date(data.created_at).getTime(),
+    parentCommentId: (data as any).parent_comment_id ?? null,
+    likes: (data as any).likes_count ?? 0,
+    liked: false,
   };
 
   posts = posts.map((p) =>
@@ -407,9 +459,20 @@ export async function addComment(
   );
   emitChange();
 
-  // Let the post's owner know someone commented (no-ops if you're
-  // commenting on your own post).
-  if (targetPost) {
+  if (parentComment) {
+    // This is a reply — notify the person being replied to (no-ops if
+    // you're replying to your own comment).
+    notifyPostOwner({
+      postId,
+      postOwnerId: parentComment.authorId,
+      category: "Updates",
+      icon: "return-down-forward-outline",
+      title: `${authorName} replied to your comment`,
+      subtitle: trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed,
+    });
+  } else if (targetPost) {
+    // Top-level comment — let the post's owner know (no-ops if you're
+    // commenting on your own post).
     notifyPostOwner({
       postId,
       postOwnerId: targetPost.authorId,
@@ -421,6 +484,62 @@ export async function addComment(
   }
 
   return newComment;
+}
+
+// Toggles the CURRENT user's like on a comment (mirrors toggleLike for
+// posts above), with the same optimistic-update-then-roll-back-on-error
+// pattern. post_comments.likes_count is kept in sync by a DB trigger on
+// the comment_likes table, matching how pet_posts.likes_count works.
+export async function toggleCommentLike(postId: string, commentId: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const post = posts.find((p) => p.id === postId);
+  const comment = post?.comments.find((c) => c.id === commentId);
+  if (!post || !comment) return;
+
+  const wasLiked = comment.liked;
+
+  const applyLikeState = (liked: boolean, likes: number) => {
+    posts = posts.map((p) =>
+      p.id === postId
+        ? {
+            ...p,
+            comments: p.comments.map((c) =>
+              c.id === commentId ? { ...c, liked, likes } : c,
+            ),
+          }
+        : p,
+    );
+    emitChange();
+  };
+
+  // Optimistic update so the heart responds instantly.
+  applyLikeState(!wasLiked, wasLiked ? comment.likes - 1 : comment.likes + 1);
+
+  if (wasLiked) {
+    const { error } = await supabase
+      .from("comment_likes")
+      .delete()
+      .eq("comment_id", commentId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.warn("Failed to unlike comment:", error.message);
+      applyLikeState(true, comment.likes);
+    }
+  } else {
+    const { error } = await supabase
+      .from("comment_likes")
+      .insert({ comment_id: commentId, user_id: user.id });
+
+    if (error) {
+      console.warn("Failed to like comment:", error.message);
+      applyLikeState(false, comment.likes);
+    }
+  }
 }
 
 // Deletes a single comment (RLS only allows the comment's own author to do
@@ -436,10 +555,17 @@ export async function deleteComment(
 
   const previousPosts = posts;
 
-  // Optimistic update so the comment disappears from the UI immediately.
+  // Optimistic update so the comment (and, if it's a top-level comment,
+  // its replies — which cascade-delete server-side too) disappears from
+  // the UI immediately.
   posts = posts.map((p) =>
     p.id === postId
-      ? { ...p, comments: p.comments.filter((c) => c.id !== commentId) }
+      ? {
+          ...p,
+          comments: p.comments.filter(
+            (c) => c.id !== commentId && c.parentCommentId !== commentId,
+          ),
+        }
       : p,
   );
   emitChange();
